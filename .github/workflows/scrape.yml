@@ -2,9 +2,12 @@ name: Daily YouTube Scraper (CSV only)
 
 on:
   schedule:
-    # Runs every day at 23:30 IST ≈ 18:00 UTC
+    # 18:00 UTC ≈ 23:30 IST
     - cron: "0 18 * * *"
-  workflow_dispatch: {}  # Allow manual run button
+  workflow_dispatch: {}
+
+permissions:
+  contents: write   # 👈 IMPORTANT: allow pushing commits
 
 jobs:
   run-scraper:
@@ -14,7 +17,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          persist-credentials: true   # Needed to push CSV back
+          persist-credentials: false   # we'll set our own auth
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -31,13 +34,18 @@ jobs:
           python scrape.py
 
       - name: Commit and push CSV (if changed)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           git add data/latest_20_livestreams_precise.csv
 
+          # If no changes, skip commit
           git diff --cached --quiet && echo "No changes to commit" && exit 0
 
           git commit -m "Daily update: latest livestream CSV"
-          git push
+
+          # Use token to push
+          git push https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }} HEAD:${{ github.ref_name }}
