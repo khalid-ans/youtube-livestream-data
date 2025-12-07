@@ -8,9 +8,10 @@ Extracts the latest 20 livestreams with:
 
 This version:
 - Is a plain Python script (no Colab !pip).
-- Saves both:
+- Always creates:
     1) Excel: latest_20_livestreams_precise.xlsx
     2) CSV:   data/latest_20_livestreams_precise.csv
+  even if no livestreams are found (empty file with headers).
 """
 
 import re
@@ -63,10 +64,10 @@ def extract_json_from_html(html_content, var_name='ytInitialData'):
     """
     Extract JSON data embedded in YouTube HTML.
 
-    First tries specific patterns:
-        var ytInitialData = {...};
-        window["ytInitialData"] = {...};
-    Then falls back to a generic "find object after ytInitialData" approach.
+    Tries:
+      - var ytInitialData = {...};
+      - window["ytInitialData"] = {...};
+    Then a generic "find object after var_name" approach.
     """
     # Pattern 1: var ytInitialData = {...};
     pattern = rf'var {var_name}\s*=\s*(\{{.*?\}});'
@@ -404,44 +405,47 @@ def main():
     print(f"✅ Filtered {len(livestream_data)} livestreams to analyze")
 
     if not livestream_data:
-        print("\n❌ No data found.")
-        return
+        print("\n❌ No data found. Creating EMPTY files (headers only).")
 
-    # Step 3: Detailed metadata
-    fetch_detailed_metadata(livestream_data)
+    # Step 3: Detailed metadata (only if there is data)
+    if livestream_data:
+        fetch_detailed_metadata(livestream_data)
 
-    # Step 4: Build DataFrame and save to Excel + CSV
+    # Step 4: Build DataFrame and save to Excel + CSV (ALWAYS)
     columns = [
         'video_id', 'title', 'teacher_name', 'published_at', 'published_time', 
         'views', 'likes', 'comments', 'duration_seconds', 'url'
     ]
 
     df = pd.DataFrame(livestream_data)
-    
-    # Ensure all columns exist
+
+    # Ensure all columns exist even if df is empty
     for col in columns:
         if col not in df.columns:
             df[col] = ''
         
     df = df[columns]
     
-    # Calculate Engagement
-    df['engagement_score'] = df['likes'] + df['comments']
+    # Calculate Engagement (will be 0 for empty df)
+    df['engagement_score'] = df.get('likes', 0) + df.get('comments', 0)
     
-    # Save Excel (optional, for manual use)
+    # Save Excel (for manual checks)
     excel_file = 'latest_20_livestreams_precise.xlsx'
     df.to_excel(excel_file, index=False)
     print(f"\n✅ Excel file saved: {excel_file}")
 
-    # Save CSV (for GitHub Actions / Google Sheets pipeline)
+    # Save CSV (for GitHub Actions / Google Sheets)
     os.makedirs("data", exist_ok=True)
     csv_path = os.path.join("data", "latest_20_livestreams_precise.csv")
     df.to_csv(csv_path, index=False, encoding="utf-8")
     print(f"✅ CSV file saved: {csv_path}")
 
     # Small summary in console
-    print(f"\n📊 SUMMARY:")
-    print(df[['title', 'teacher_name', 'views', 'likes', 'comments']].head(10).to_string())
+    if not df.empty:
+        print(f"\n📊 SUMMARY:")
+        print(df[['title', 'teacher_name', 'views', 'likes', 'comments']].head(10).to_string())
+    else:
+        print("\n📊 SUMMARY: DataFrame is empty (no livestreams found).")
 
 
 if __name__ == "__main__":
