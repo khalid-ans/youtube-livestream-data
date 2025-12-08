@@ -1,39 +1,39 @@
 """
-YouTube Livestream Data Extractor - CSV Only (GitHub Actions Safe)
+YouTube Livestream Data Extractor - Selenium + CSV (GitHub Actions Safe-ish)
 =================================================================
 - Extracts latest livestream data (from channel /streams or /videos)
 - Skips scheduled/upcoming streams
+- Uses Selenium headless Chrome to load each watch page:
+    -> more reliable likes & comments from full HTML/JSON
 - Adds: teacher_name, live_status, published_at, published_time,
          days_since_published, likes, comments
-- Teacher name is detected:
-    1) Directly from title (Danish, Isha, Kajal, etc.)
-    2) If Unknown, from subject/patterns in title using get_teacher()
-- Adds derived metrics:
+- Teacher name:
+    1) Direct name in title (Danish, Isha, etc.)
+    2) If Unknown -> subject-based mapping (get_teacher)
+- Derived metrics:
     engagement_score, duration_minutes, views_per_minute, views_per_day,
     engagement_per_view, like_rate, comment_rate
-- Always creates CSV:
-    data/latest_20_livestreams_precise.csv
-- NO Excel / openpyxl required
+- Always creates CSV: data/latest_20_livestreams_precise.csv
 """
 
 import re
 import json
 import os
-import requests
-import pandas as pd
-from datetime import datetime, timezone, date, timedelta
 import time
 import warnings
+from datetime import datetime, timezone, date, timedelta
 
-warnings.filterwarnings('ignore')
+import pandas as pd
+import requests
 
-# ================= CONFIG =================
+warnings.filterwarnings("ignore")
+
+# ================ CONFIG =================
 
 CHANNEL_URL = "https://www.youtube.com/@teachingpariksha"
 TARGET_LIVESTREAMS = 20
 
-# ================= SESSION =================
-# Minimal headers that worked earlier
+# ================ HTTP SESSION (for channel pages) ================
 
 session = requests.Session()
 session.headers.update({
@@ -45,7 +45,34 @@ session.headers.update({
 
 print("✅ HTTP session configured")
 
-# ================= HELPERS =================
+# ================ SELENIUM SETUP (for watch pages) ================
+
+driver = None
+try:
+    from selenium import webdriver
+    from selenium.webdriver.chrome.options import Options
+
+    def init_driver():
+        opts = Options()
+        opts.add_argument("--headless=new")
+        opts.add_argument("--no-sandbox")
+        opts.add_argument("--disable-dev-shm-usage")
+        opts.add_argument("--disable-gpu")
+        opts.add_argument("--window-size=1280,720")
+        return webdriver.Chrome(options=opts)
+
+    try:
+        driver = init_driver()
+        print("✅ Selenium Chrome driver initialized")
+    except Exception as e:
+        driver = None
+        print("⚠️ Selenium init failed, falling back to requests-only:", e)
+
+except ImportError:
+    driver = None
+    print("⚠️ selenium package not installed, using requests-only mode")
+
+# ================ HELPERS =================
 
 def extract_json_from_html(html, var_name="ytInitialData"):
     pattern = rf"var {var_name}\s*=\s*(\{{.*?\}});"
@@ -72,7 +99,7 @@ def extract_json_from_html(html, var_name="ytInitialData"):
             depth -= 1
             if depth == 0:
                 try:
-                    return json.loads(html[start : i + 1])
+                    return json.loads(html[start: i + 1])
                 except Exception:
                     return None
     return None
@@ -109,8 +136,8 @@ def parse_duration_text(text):
         return parts[0] * 60 + parts[1]
     return parts[0] if parts else 0
 
-
 # ----- Teacher detection -----
+
 TEACHER_MAP_DIRECT = {
     "danish": "Danish Sir",
     "deepali": "Deepali Ma'am",
@@ -146,29 +173,29 @@ def detect_teacher_by_name(text: str) -> str:
 def get_teacher(t: str) -> str:
     t = t.lower()
 
-    # --- EVS & Science ---
+    # EVS & Science
     if " evs" in t or "environmental studies" in t or "environment studies" in t:
         return "Mona Ma'am"
     if "science" in t and "social" not in t:
         return "Kuldeep Sir"
 
-    # --- Languages ---
+    # Languages
     if " hindi" in t:
         return "Isha Ma'am"
     if " english" in t:
         return "Pooja Ma'am"
 
-    # --- Reasoning & Computer ---
+    # Reasoning & Computer
     if " reasoning" in t or "logical" in t or "mental ability" in t:
         return "Kajal Ma'am"
     if " computer" in t:
         return "Kajal Ma'am"
 
-    # --- Maths ---
+    # Maths
     if " maths" in t or " math " in t or "mathematics" in t or "numerical" in t or "quant" in t:
         return "Pawan Sir"
 
-    # --- SST / GK / CDP ---
+    # SST / GK / CDP
     if " cdp" in t or "child development" in t:
         return "Danish Sir"
     if " gk" in t or "general knowledge" in t or "current affairs" in t or " gs" in t:
@@ -186,14 +213,34 @@ def extract_teacher_name_from_title(title: str) -> str:
     return get_teacher(title or "")
 
 
-def days_since(date_str, fmt="%d-%m-%Y"):
-    if not date_str:
-        return None
-    try:
-        d = datetime.strptime(date_str, fmt).date()
-    except Exception:
-        return None
-    return (date.today() - d).days
+def parse_relative_published(text: str):
+    if not text:
+        return None, None
+
+    t = text.lower()
+    m = re.search(r"(\d+)", t)
+    if not m:
+        return None, None
+
+    n = int(m.group(1))
+    days_offset = 0
+
+    if "minute" in t or "min" in t or "hour" in t or "hr" in t:
+        days_offset = 0
+    elif "day" in t:
+        days_offset = n
+    elif "week" in t:
+        days_offset = n * 7
+    elif "month" in t:
+        days_offset = n * 30
+    elif "year" in t:
+        days_offset = n * 365
+    else:
+        days_offset = n
+
+    today = date.today()
+    pub_date = today - timedelta(days=days_offset)
+    return pub_date.strftime("%d-%m-%Y"), days_offset
 
 
 def is_scheduled_or_upcoming(video):
@@ -223,50 +270,7 @@ def is_scheduled_or_upcoming(video):
 
     return False
 
-# ---------- NEW: parse relative "Streamed X days ago" text ----------
-
-def parse_relative_published(text: str):
-    """
-    Convert strings like:
-    - 'Streamed 3 days ago'
-    - '2 weeks ago'
-    - '1 year ago'
-    into (published_at_dd_mm_YYYY, days_since_published).
-    If parsing fails, return (None, None).
-    """
-    if not text:
-        return None, None
-
-    t = text.lower()
-    # extract first integer
-    m = re.search(r"(\d+)", t)
-    if not m:
-        return None, None
-
-    n = int(m.group(1))
-    days_offset = 0
-
-    if "minute" in t or "min" in t or "hour" in t or "hr" in t:
-        days_offset = 0
-    elif "day" in t:
-        days_offset = n
-    elif "week" in t:
-        days_offset = n * 7
-    elif "month" in t:
-        days_offset = n * 30
-    elif "year" in t:
-        days_offset = n * 365
-    else:
-        # Unknown unit, just assume days
-        days_offset = n
-
-    today = date.today()
-    pub_date = today - timedelta(days=days_offset)
-    published_at = pub_date.strftime("%d-%m-%Y")
-    days_since_pub = days_offset
-    return published_at, days_since_pub
-
-# ================= SCRAPER =================
+# ================ SCRAPER: CHANNEL TABS =================
 
 def fetch_channel_videos(url):
     tabs = [f"{url}/streams", f"{url}/videos", url]
@@ -298,115 +302,112 @@ def fetch_channel_videos(url):
     return []
 
 
-# ---------- UPDATED: takes approx_published_text from tile ----------
+# ================ SCRAPER: WATCH PAGE (Selenium) =================
 
 def extract_video_details(video_url, approx_published_text=None):
     """
-    For a given video URL:
-    - likes           (from ytInitialData -> segmentedLikeDislikeButtonRenderer, with fallbacks)
-    - comments        (from JSON / regex fallbacks)
-    - published_at    (dd-mm-YYYY)
-    - published_time  (HH:MM:SS)
-    - days_since_published (int)
-
-    Strategy for date:
-      1) Try uploadDate from watch HTML (exact when present)
-      2) Else, approximate using channel tile's publishedTimeText ("X days ago")
-      3) Else, fallback to today
+    Uses Selenium (if available) to load full watch page HTML,
+    then extracts likes, comments, and date info from JSON/regex.
+    Falls back to requests-only if Selenium is not available.
     """
-    try:
-        r = session.get(video_url, timeout=30)
-        html = r.text
+    # 1) Get HTML either via Selenium or via requests
+    html = ""
+    if driver is not None:
+        try:
+            driver.get(video_url)
+            time.sleep(3)  # small wait for JS & JSON to load
+            html = driver.page_source
+        except Exception as e:
+            print(f"⚠️ Selenium error for {video_url}: {e}")
+    if not html:
+        try:
+            r = session.get(video_url, timeout=30)
+            html = r.text
+        except Exception:
+            html = ""
 
-        # ---------- 1) Parse ytInitialData JSON from watch page ----------
-        yt_data = extract_json_from_html(html, "ytInitialData")
+    # ---------- Likes ----------
+    likes = 0
+    found_likes = False
 
-        # ---------- 2) REAL LIKES via hidden JSON ----------
-        likes = 0
-        found_likes = False
+    yt_data = extract_json_from_html(html, "ytInitialData")
+    if yt_data:
+        results = safe_get(
+            yt_data,
+            "contents", "twoColumnWatchNextResults",
+            "results", "results", "contents",
+            default=[]
+        )
+        for item in results:
+            primary = item.get("videoPrimaryInfoRenderer")
+            if not primary:
+                continue
 
-        if yt_data:
-            results = safe_get(
-                yt_data,
-                "contents", "twoColumnWatchNextResults",
-                "results", "results", "contents",
+            buttons = safe_get(
+                primary,
+                "videoActions", "menuRenderer", "topLevelButtons",
                 default=[]
             )
-            for item in results:
-                primary = item.get("videoPrimaryInfoRenderer")
-                if not primary:
-                    continue
-
-                buttons = safe_get(
-                    primary,
-                    "videoActions", "menuRenderer", "topLevelButtons",
-                    default=[]
-                )
-                for btn in buttons:
-                    # segmentedLikeDislikeButtonRenderer is the modern like button
-                    like_renderer = (
-                        safe_get(
-                            btn,
-                            "segmentedLikeDislikeButtonRenderer",
-                            "likeButton",
-                            "toggleButtonRenderer"
-                        )
-                        or safe_get(btn, "toggleButtonRenderer")
+            for btn in buttons:
+                like_renderer = (
+                    safe_get(
+                        btn,
+                        "segmentedLikeDislikeButtonRenderer",
+                        "likeButton",
+                        "toggleButtonRenderer",
                     )
-                    if like_renderer:
-                        # Accessibility label: e.g. "1,234 likes"
-                        access_label = safe_get(
-                            like_renderer,
-                            "defaultText", "accessibility",
-                            "accessibilityData", "label"
-                        )
-                        if access_label:
-                            likes = parse_exact_count(access_label)
-                            found_likes = True
-                            break
-                if found_likes:
-                    break
+                    or safe_get(btn, "toggleButtonRenderer")
+                )
+                if like_renderer:
+                    access_label = safe_get(
+                        like_renderer,
+                        "defaultText", "accessibility",
+                        "accessibilityData", "label"
+                    )
+                    if access_label:
+                        likes = parse_exact_count(access_label)
+                        found_likes = True
+                        break
+            if found_likes:
+                break
 
-        # Fallback: regex on plain HTML
-        if not found_likes:
-            like_match = re.search(r'"label":"([\d,]+)\s+likes"', html)
-            if like_match:
-                likes = parse_exact_count(like_match.group(1))
+    if not found_likes and html:
+        like_match = re.search(r'"label":"([\d,]+)\s+likes"', html)
+        if like_match:
+            likes = parse_exact_count(like_match.group(1))
 
-        # ---------- 3) COMMENTS via JSON + regex ----------
-        comments = 0
-        found_comments = False
+    # ---------- Comments ----------
+    comments = 0
+    found_comments = False
 
-        # Pattern 1: "commentCount":"1234" in JSON
+    if html:
         comment_raw = re.search(r'"commentCount":"(\d+)"', html)
         if comment_raw:
             comments = int(comment_raw.group(1))
             found_comments = True
 
-        # Pattern 2: "1,234 Comments" as text
         if not found_comments:
             comment_match = re.search(r'"text":"([\d,]+)\s+Comments"', html)
             if comment_match:
                 comments = parse_exact_count(comment_match.group(1))
                 found_comments = True
 
-        # Pattern 3: sometimes in "simpleText":"1,234 Comments"
         if not found_comments:
             comment_match2 = re.search(r'"simpleText":"([\d,]+)\s+Comments"', html)
             if comment_match2:
                 comments = parse_exact_count(comment_match2.group(1))
                 found_comments = True
 
-        # ---------- 4) Published date/time (same logic as before) ----------
-        published_at = ""
-        published_time = ""
-        days = None
+    # ---------- Published date/time ----------
+    published_at = ""
+    published_time = ""
+    days = None
 
-        # Try exact uploadDate
+    if html:
         upload_match = re.search(r'"uploadDate":\s*"([^"]+)"', html)
         if upload_match:
             try:
-                raw = upload_match.group(1)  # e.g., 2025-02-10T15:30:00Z or 2025-02-10
+                raw = upload_match.group(1)
                 iso = raw.replace("Z", "+00:00")
                 if "T" in iso:
                     dt = datetime.fromisoformat(iso)
@@ -420,34 +421,23 @@ def extract_video_details(video_url, approx_published_text=None):
                 published_time = ""
                 days = None
 
-        # Fallback: approximate from tile ("Streamed X days ago")
-        if not published_at and approx_published_text:
-            approx_date, approx_days = parse_relative_published(approx_published_text)
-            if approx_date is not None:
-                published_at = approx_date
-                published_time = "00:00:00"
-                days = approx_days
+    if not published_at and approx_published_text:
+        approx_date, approx_days = parse_relative_published(approx_published_text)
+        if approx_date is not None:
+            published_at = approx_date
+            published_time = "00:00:00"
+            days = approx_days
 
-        # Final fallback: today
-        if not published_at:
-            now = datetime.now(timezone.utc)
-            published_at = now.strftime("%d-%m-%Y")
-            published_time = now.strftime("%H:%M:%S")
-            days = 0
-
-        return likes, comments, published_at, published_time, days
-
-    except Exception:
+    if not published_at:
         now = datetime.now(timezone.utc)
-        return (
-            0,
-            0,
-            now.strftime("%d-%m-%Y"),
-            now.strftime("%H:%M:%S"),
-            0,
-        )
+        published_at = now.strftime("%d-%m-%Y")
+        published_time = now.strftime("%H:%M:%S")
+        days = 0
+
+    return likes, comments, published_at, published_time, days
 
 
+# ================ MAIN =================
 
 def main():
     videos_data = fetch_channel_videos(CHANNEL_URL)
@@ -475,7 +465,6 @@ def main():
         len_text = safe_get(video, "lengthText", "simpleText", default="")
         duration_sec = parse_duration_text(len_text)
 
-        # NEW: grab the relative published text from tile (e.g. "Streamed 3 days ago")
         published_tile_text = safe_get(video, "publishedTimeText", "simpleText", default="")
 
         video_url = f"https://www.youtube.com/watch?v={video_id}"
@@ -501,7 +490,7 @@ def main():
             "url": video_url,
         })
 
-        time.sleep(0.3)
+        time.sleep(0.5)
 
     print("✅ Final livestream rows (excluding scheduled/upcoming):", len(livestream_data))
 
@@ -513,11 +502,9 @@ def main():
     ]
 
     df = pd.DataFrame(livestream_data)
-
     for col in base_columns:
         if col not in df.columns:
             df[col] = ""
-
     df = df[base_columns]
 
     # Derived metrics
@@ -527,12 +514,10 @@ def main():
     df["duration_seconds"] = pd.to_numeric(df["duration_seconds"], errors="coerce").fillna(0.0)
 
     df["engagement_score"] = df["likes"] + df["comments"]
-
     df["duration_minutes"] = df.apply(
         lambda r: 0 if r["duration_seconds"] <= 0 else r["duration_seconds"] / 60.0,
         axis=1,
     )
-
     df["views_per_minute"] = df.apply(
         lambda r: 0 if r["duration_minutes"] <= 0 else r["views"] / r["duration_minutes"],
         axis=1,
@@ -551,17 +536,14 @@ def main():
         return row["views"] / d
 
     df["views_per_day"] = df.apply(calc_views_per_day, axis=1)
-
     df["engagement_per_view"] = df.apply(
         lambda r: 0 if r["views"] <= 0 else r["engagement_score"] / r["views"],
         axis=1,
     )
-
     df["like_rate"] = df.apply(
         lambda r: 0 if r["views"] <= 0 else r["likes"] / r["views"],
         axis=1,
     )
-
     df["comment_rate"] = df.apply(
         lambda r: 0 if r["views"] <= 0 else r["comments"] / r["views"],
         axis=1,
@@ -576,33 +558,26 @@ def main():
         "like_rate",
         "comment_rate",
     ]
-
     all_columns = base_columns + derived_columns
     df = df[all_columns]
 
     os.makedirs("data", exist_ok=True)
     csv_path = "data/latest_20_livestreams_precise.csv"
     df.to_csv(csv_path, index=False, encoding="utf-8")
-
     print("✅ CSV file saved:", csv_path)
+
     if not df.empty:
         print("\n📊 SAMPLE:")
         print(
             df[
-                [
-                    "title",
-                    "published_at",
-                    "published_time",
-                    "days_since_published",
-                    "teacher_name",
-                    "views",
-                ]
-            ]
-            .head(5)
-            .to_string()
+                ["title", "published_at", "days_since_published", "views", "likes", "comments"]
+            ].head(5).to_string()
         )
+
+    if driver is not None:
+        driver.quit()
+        print("🚪 Closed Selenium driver")
 
 
 if __name__ == "__main__":
     main()
-
