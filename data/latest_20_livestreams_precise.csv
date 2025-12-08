@@ -1,21 +1,190 @@
-video_id,title,teacher_name,live_status,published_at,days_since_published,views,likes,comments,duration_seconds,url
-s9DWPdt4xew,CTET Feb 2026 SST Complete Class | CTET Paper 2 NCERT Social Science | CTET 2026 SST For Paper 2,Unknown,was_live,2025-12-06,2,0,0,0,0,https://www.youtube.com/watch?v=s9DWPdt4xew
-3Jtq4Fs9wQI,CTET 2026 CDP: Topic wise Marathon Class | CTET Paper 1 & 2 CDP Marathon Class by Danish Sir | CTET,Danish Sir,was_live,2025-11-27,10,0,0,0,0,https://www.youtube.com/watch?v=3Jtq4Fs9wQI
-gwGptarwiyQ,BPSC AEDO and BPSC TRE 4.0 GK GS Marathon | Bihar Special for BPSC AEDO by Danish Sir | BPSC,Danish Sir,was_live,2025-12-07,0,0,0,0,0,https://www.youtube.com/watch?v=gwGptarwiyQ
-hFDvyNck6kg,CTET 2026 EVS Class | CTET Paper 1 | CTET Paper 1 EVS | CTET EVS By Mona Ma'am @teachingpariksha ​,Mona Ma'am,was_live,2025-12-08,0,0,0,0,0,https://www.youtube.com/watch?v=hFDvyNck6kg
-BRPuOnFThF8,KVS/NVS Hindi Marathon | KVS Hindi Class | KVS NVS Tier 1 Hindi | Hindi for KVS 2025 | KVS,Unknown,was_live,2025-12-08,0,0,0,0,0,https://www.youtube.com/watch?v=BRPuOnFThF8
-urwShppDMHk,CTET SST Paper 2 | CTET 2025 NCERT Social Science Revision Class | CTET Paper 2 SST,Unknown,was_live,2025-12-08,0,2596,0,0,1814,https://www.youtube.com/watch?v=urwShppDMHk
-s0RLyMoB-8A,CTET Feb 2026 Maths Marathon | CTET Maths Paper 2 PYQs Marathon | CTET Maths by Pawan Sir #ctet,Pawan Sir,was_live,2025-12-08,0,575,0,0,3055,https://www.youtube.com/watch?v=s0RLyMoB-8A
-9DNa3xt8GDg,CTET Feb 2026 Science NCERT Based Class | CTET Science Paper 2 PYQs Marathon | CTET Science #6,Unknown,was_live,2025-12-08,0,1101,0,0,3624,https://www.youtube.com/watch?v=9DNa3xt8GDg
-OUjzEmX-JeU,CTET 2026 CDP | CTET CDP Class | CTET CDP PYQ's Analysis Series | CTET CDP Marathon by Deepali Ma'am,Deepali Ma'am,was_live,2025-12-08,0,2279,0,0,3562,https://www.youtube.com/watch?v=OUjzEmX-JeU
-ruclEHT40-I,KVS/NVS Numerical Ability Marathon | KVS Numerical Ability Class | KVS NVS Tier 1 Numerical Ability,Unknown,was_live,2025-12-08,0,2169,0,0,3048,https://www.youtube.com/watch?v=ruclEHT40-I
-NdxRppKfBZ8,KVS 2025 Reasoning Class | KVS PRT Reasoning Marathon | Reasoning by Kajal Ma'am | KVS 2025 | #kvs,Kajal Ma'am,was_live,2025-12-08,0,2671,0,0,3850,https://www.youtube.com/watch?v=NdxRppKfBZ8
-UgDVU_W-Ryw,BPSC AEDO Biggest Announcement By Teaching Pariksha | BPSC AEDO Exam #bpsc,Unknown,was_live,2025-12-08,0,12380,0,0,1009,https://www.youtube.com/watch?v=UgDVU_W-Ryw
-QtyUgu6FZfA,CTET Feb 2026 Science NCERT Based Class | CTET Science Paper 2 PYQs Marathon | CTET Science #5,Unknown,was_live,2025-12-08,0,2354,0,0,3722,https://www.youtube.com/watch?v=QtyUgu6FZfA
-b4VjO7ykH9Q,KVS/NVS Numerical Ability Marathon | KVS Numerical Ability Class | KVS NVS Tier 1 Numerical Ability,Unknown,was_live,2025-12-08,0,4627,0,0,3081,https://www.youtube.com/watch?v=b4VjO7ykH9Q
-we1iaPL_eKI,BPSC AEDO Official Exam Date Out | AEDO New Form Fill Up Date | AEDO Bihar Vacancy 2025 Latest News,Unknown,was_live,2025-12-08,0,29749,0,0,836,https://www.youtube.com/watch?v=we1iaPL_eKI
-jpbwsucozdo,UP LT Grade Paper Analysis | UP LT Grade 2025 | GK GS Complete Analysis by Danish Sir,Danish Sir,was_live,2025-12-08,0,25080,0,0,3480,https://www.youtube.com/watch?v=jpbwsucozdo
-_dvQPhmUvXU,KVS 2025 Computer Marathon | KVS Computer Literacy Marathon Class | KVS NVS Tier 1 Computer Class,Unknown,was_live,2025-12-08,0,11043,0,0,7779,https://www.youtube.com/watch?v=_dvQPhmUvXU
-f14DadTcoz4,CTET Feb 2026 Hindi Class | CTET Paper 1 & 2 Hindi Marathon | CTET Hindi By Isha Ma'am #ctet,Isha Ma'am,was_live,2025-12-08,0,3532,0,0,4814,https://www.youtube.com/watch?v=f14DadTcoz4
-YAh4SqTifQs,CTET 2026 EVS Class | CTET Paper 1 | CTET Paper 1 EVS | CTET EVS By Mona Ma'am @teachingpariksha ​,Mona Ma'am,was_live,2025-12-08,0,4252,0,0,3553,https://www.youtube.com/watch?v=YAh4SqTifQs
-ZU9VWyfvlA8,KVS/NVS Hindi Marathon | KVS Hindi Class | KVS NVS Tier 1 Hindi | Hindi for KVS 2025 | KVS,Unknown,was_live,2025-12-08,0,6140,0,0,2864,https://www.youtube.com/watch?v=ZU9VWyfvlA8
+video_id,title,description,teacher_name,live_status,published_at,published_time,days_since_published,views,likes,comments,duration_seconds,url,engagement_score,duration_minutes,views_per_minute,views_per_day,engagement_per_view,like_rate,comment_rate
+s9DWPdt4xew,CTET Feb 2026 SST Complete Class | CTET Paper 2 NCERT Social Science | CTET 2026 SST For Paper 2,"CTET SST Paper 2 | CTET 2025 NCERT Social Science Complete Class | CTET Paper 2 SST | CTET SST For Paper 2 | CTET  2025 SST | CTET Paper 2 Social Science Class | CTET 2026 SST For Paper 2 | CTET  SST Pedagogy | CTET SST Marathon For Paper 2 by Danish Sir @teachingpariksha  
+
+
+🔖𝐓𝐨 𝐁𝐮𝐲 𝐂𝐓𝐄𝐓 𝟐𝟎𝟐𝟔 𝐂𝐨𝐮𝐫𝐬𝐞 :  https://linktr.ee/teachingparikshactet
+
+=====================================                       
+𝐈𝐦𝐩𝐨𝐫𝐭𝐚𝐧𝐭 𝐋𝐢𝐧𝐤𝐬 -
+✅𝐂𝐓𝐄𝐓 𝟐𝟎𝟐𝟔 𝐅𝐫𝐞𝐞 𝐓𝐞𝐬𝐭 & 𝐒𝐮𝐜𝐜𝐞𝐬𝐬 𝐊𝐢𝐭 𝐅𝐨𝐫𝐦 : https://forms.gle/XyK7xYQ3YfTRPSxH6
+
+✅𝐂𝐓𝐄𝐓 𝐂𝐃𝐏 𝐓𝐞𝐥𝐞𝐠𝐫𝐚𝐦 𝐂𝐡𝐚𝐧𝐧𝐞𝐥 𝐋𝐢𝐧𝐤 - https://t.me/cdpbytp
+
+✅𝐂𝐓𝐄𝐓 𝐁𝐲 𝐓𝐞𝐚𝐜𝐡𝐢𝐧𝐠 𝐏𝐚𝐫𝐢𝐤𝐬𝐡𝐚 𝐓𝐞𝐥𝐞𝐠𝐫𝐚𝐦 𝐋𝐢𝐧𝐤 - https://t.me/ctetbytp
+
+✅𝐓𝐞𝐚𝐜𝐡𝐢𝐧𝐠 𝐏𝐚𝐫𝐢𝐤𝐬𝐡𝐚 𝐀𝐩𝐩 𝐋𝐢𝐧𝐤 - https://play.google.com/store/apps/details?id=com.teachingpariksha.courses&hl=en&gl=US
+
+✅𝐂𝐓𝐄𝐓 𝐖𝐡𝐚𝐭𝐬𝐀𝐩𝐩 𝐂𝐡𝐚𝐧𝐧𝐞𝐥: https://whatsapp.com/channel/0029VacjvcPEwEk5JS7tIY25
+
+=====================================
+👉 𝐂𝐓𝐄𝐓 𝟐𝟎𝟐𝟔 𝐂𝐃𝐏 𝐏𝐥𝐚𝐲𝐥𝐢𝐬𝐭 𝐛𝐲 𝐃𝐚𝐧𝐢𝐬𝐡 𝐒𝐢𝐫 - https://www.youtube.com/playlist?list=PLapuBWGrq2_u1OyQufANTLAiuYeYXpIXz
+=====================================
+
+This class caters to learners of all levels, whether you're a beginner or have prior experience. You'll have access to plenty of practice questions, previous year CTET SST papers, CTET SST previous year question papers, CTET SST paper 2 practice sets, CTET SST, and CTET SST teaching tips. Along with expert guidance from Danish Sir on CTET SST and Pedagogy, this will help you become more confident and improve your problem-solving skills.
+
+More Info Covered in This Session:
+1. CTET 2026 SST Topic-Wise Complete Theory
+2. Motivation & Learning – Full Explanation
+3. Cognition, Sensation & Perception Concepts
+4. CTET Paper 2 SST Strategy
+5. Updated CTET 2025–26 SST Practice Questions
+6. SST Exam-Oriented Tips & Tricks for 2026
+
+====================================
+
+𝐓𝐞𝐚𝐜𝐡𝐢𝐧𝐠 𝐏𝐚𝐫𝐢𝐤𝐬𝐡𝐚'𝐬 𝐂𝐨𝐦𝐩𝐥𝐞𝐭𝐞 𝐂𝐓𝐄𝐓 𝟐𝟎𝟐𝟔 𝐏𝐥𝐚𝐲𝐥𝐢𝐬𝐭 -
+
+👉𝐂𝐓𝐄𝐓 𝟐𝟎𝟐𝟔 𝐄𝐕𝐒 𝐏𝐥𝐚𝐲𝐥𝐢𝐬𝐭 - https://www.youtube.com/playlist?list=PLapuBWGrq2_ttKF4qjrHEgFanK2ICR6Z1
+
+👉𝐂𝐓𝐄𝐓 𝟐𝟎𝟐𝟔 𝐂𝐃𝐏 𝐏𝐥𝐚𝐲𝐥𝐢𝐬𝐭 𝐛𝐲 𝐃𝐚𝐧𝐢𝐬𝐡 𝐒𝐢𝐫 - https://www.youtube.com/playlist?list=PLapuBWGrq2_u1OyQufANTLAiuYeYXpIXz
+
+👉𝐂𝐓𝐄𝐓 𝟐𝟎𝟐𝟔 𝐂𝐃𝐏 𝐏𝐥𝐚𝐲𝐥𝐢𝐬𝐭 𝐛𝐲 𝐃𝐞𝐞𝐩𝐚𝐥𝐢 𝐌𝐚'𝐚𝐦 - https://www.youtube.com/playlist?list=PLapuBWGrq2_tyGB07k6STpHYgEPs_xAGk
+
+👉𝐂𝐓𝐄𝐓 𝟐𝟎𝟐𝟔 𝐌𝐚𝐭𝐡𝐬 𝐏𝐥𝐚𝐲𝐥𝐢𝐬𝐭 - https://www.youtube.com/playlist?list=PLapuBWGrq2_tsqaUAfCLxNY8cQTG9wqas
+
+👉𝐂𝐓𝐄𝐓 𝟐𝟎𝟐𝟔  𝐒𝐜𝐢𝐞𝐧𝐜𝐞 𝐏𝐥𝐚𝐲𝐥𝐢𝐬𝐭 - https://www.youtube.com/playlist?list=PLapuBWGrq2_sHlcuIjbzqe9ab7WJkLKfQ
+
+👉𝐂𝐓𝐄𝐓 𝟐𝟎𝟐𝟔 𝐇𝐢𝐧𝐝𝐢 𝐏𝐥𝐚𝐲𝐥𝐢𝐬𝐭 - https://www.youtube.com/playlist?list=PLapuBWGrq2_ukEWGkN10LCAJU1Y2ARr6I 
+
+=====================================
+𝐒𝐨𝐜𝐢𝐚𝐥 𝐌𝐞𝐝𝐢𝐚 𝐋𝐢𝐧𝐤𝐬 - 
+✅𝐓𝐞𝐥𝐞𝐠𝐫𝐚𝐦 - https://t.me/teachingparikshaofficial
+✅𝐈𝐧𝐬𝐭𝐚𝐠𝐫𝐚𝐦 - https://www.instagram.com/teachingpariksha/
+✅𝐅𝐚𝐜𝐞𝐛𝐨𝐨𝐤 - https://www.facebook.com/TeachingPariksha/
+=====================================
+𝐅𝐨𝐫 𝐀𝐧𝐲 𝐝𝐨𝐮𝐛𝐭 𝐚𝐧𝐝 𝐐𝐮𝐞𝐫𝐲 𝐊𝐢𝐧𝐝𝐥𝐲 𝐂𝐚𝐥𝐥 𝐨𝐫 𝐖𝐡𝐚𝐭𝐬𝐀𝐩𝐩 𝐮𝐬 𝐨𝐧 - 7611-101-101  and   9697-888-444
+====================================
+#ctet #cdp #ctetcdp #ctet #ctet2025 #ctet2026 #ctetpreparation #ctetpaper1 #ctetpaper2 #cdpforctetinhindi #ctetnews #ctetexam #teachingpariksha #ctetsyllabus #ctetpaper #ctetnotification",Unknown,was_live,2025-12-06,00:48:18,2,0.0,0.0,0.0,0.0,https://www.youtube.com/watch?v=s9DWPdt4xew,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+3Jtq4Fs9wQI,CTET 2026 CDP: Topic wise Marathon Class | CTET Paper 1 & 2 CDP Marathon Class by Danish Sir | CTET,"CTET 2025-26 CDP Topic Wise Marathon Class | CTET Paper 1 CDP | CTET Paper 2 CDP | Motivation & Learning, Cognition & Sensation | CTET CDP in Hindi | CTET CDP New Updated Practice Questions Discussion by Danish Sir @teachingpariksha 
+
+🔖𝐓𝐨 𝐁𝐮𝐲 𝐂𝐓𝐄𝐓 𝟐𝟎𝟐𝟔 𝐂𝐨𝐮𝐫𝐬𝐞 :  https://linktr.ee/teachingparikshactet
+
+=====================================                       
+𝐈𝐦𝐩𝐨𝐫𝐭𝐚𝐧𝐭 𝐋𝐢𝐧𝐤𝐬 -
+✅𝐂𝐓𝐄𝐓 𝟐𝟎𝟐𝟔 𝐅𝐫𝐞𝐞 𝐓𝐞𝐬𝐭 & 𝐒𝐮𝐜𝐜𝐞𝐬𝐬 𝐊𝐢𝐭 𝐅𝐨𝐫𝐦 : https://forms.gle/XyK7xYQ3YfTRPSxH6
+
+✅𝐂𝐓𝐄𝐓 𝐂𝐃𝐏 𝐓𝐞𝐥𝐞𝐠𝐫𝐚𝐦 𝐂𝐡𝐚𝐧𝐧𝐞𝐥 𝐋𝐢𝐧𝐤 - https://t.me/cdpbytp
+
+✅𝐂𝐓𝐄𝐓 𝐁𝐲 𝐓𝐞𝐚𝐜𝐡𝐢𝐧𝐠 𝐏𝐚𝐫𝐢𝐤𝐬𝐡𝐚 𝐓𝐞𝐥𝐞𝐠𝐫𝐚𝐦 𝐋𝐢𝐧𝐤 - https://t.me/ctetbytp
+
+✅𝐓𝐞𝐚𝐜𝐡𝐢𝐧𝐠 𝐏𝐚𝐫𝐢𝐤𝐬𝐡𝐚 𝐀𝐩𝐩 𝐋𝐢𝐧𝐤 - https://play.google.com/store/apps/details?id=com.teachingpariksha.courses&hl=en&gl=US
+
+✅𝐂𝐓𝐄𝐓 𝐖𝐡𝐚𝐭𝐬𝐀𝐩𝐩 𝐂𝐡𝐚𝐧𝐧𝐞𝐥: https://whatsapp.com/channel/0029VacjvcPEwEk5JS7tIY25
+
+=====================================
+👉 𝐂𝐓𝐄𝐓 𝟐𝟎𝟐𝟔 𝐂𝐃𝐏 𝐏𝐥𝐚𝐲𝐥𝐢𝐬𝐭 𝐛𝐲 𝐃𝐚𝐧𝐢𝐬𝐡 𝐒𝐢𝐫 - https://www.youtube.com/playlist?list=PLapuBWGrq2_u1OyQufANTLAiuYeYXpIXz
+=====================================
+
+In this powerful and complete CDP Marathon Session, Danish Sir from Teaching Pariksha covers every important topic of Child Development & Pedagogy (CDP) for CTET 2025–2026. This class includes Topic Wise Detailed Theory + Tricks + Concept Clearing Examples + New Updated Practice Questions, making it one of the most comprehensive CDP sessions for CTET Paper 1 and Paper 2.
+
+Students preparing for CTET 2026 will get full clarity on core CDP concepts such as Motivation & Learning, Cognition, Individual Differences, Growth & Development, Learning Theories, Classroom Pedagogy, and many more exam-focused topics. This marathon class is specially designed to strengthen your CDP foundation and boost accuracy in both Paper 1 and 2.
+
+This session is extremely helpful for aspirants who want to score full marks in CDP and are searching for complete CDP preparation, topic-wise theory, and latest CTET 2026 CDP updates in Hindi. All the new trends, expected question types, and updated CTET CDP practice sets for CTET 2025–26 are discussed by Danish Sir in detail.
+
+More Info Covered in This Session:
+1. CTET 2026 CDP Topic-Wise Complete Theory
+2. Motivation & Learning – Full Explanation
+3. Cognition, Sensation & Perception Concepts
+4. CTET Paper 1 & Paper 2 CDP Strategy
+5. Updated CTET 2025–26 CDP Practice Questions
+6. CDP Exam-Oriented Tips & Tricks for 2026
+
+====================================
+
+𝐓𝐞𝐚𝐜𝐡𝐢𝐧𝐠 𝐏𝐚𝐫𝐢𝐤𝐬𝐡𝐚'𝐬 𝐂𝐨𝐦𝐩𝐥𝐞𝐭𝐞 𝐂𝐓𝐄𝐓 𝟐𝟎𝟐𝟔 𝐏𝐥𝐚𝐲𝐥𝐢𝐬𝐭 -
+
+👉𝐂𝐓𝐄𝐓 𝟐𝟎𝟐𝟔 𝐄𝐕𝐒 𝐏𝐥𝐚𝐲𝐥𝐢𝐬𝐭 - https://www.youtube.com/playlist?list=PLapuBWGrq2_ttKF4qjrHEgFanK2ICR6Z1
+
+👉𝐂𝐓𝐄𝐓 𝟐𝟎𝟐𝟔 𝐂𝐃𝐏 𝐏𝐥𝐚𝐲𝐥𝐢𝐬𝐭 𝐛𝐲 𝐃𝐚𝐧𝐢𝐬𝐡 𝐒𝐢𝐫 - https://www.youtube.com/playlist?list=PLapuBWGrq2_u1OyQufANTLAiuYeYXpIXz
+
+👉𝐂𝐓𝐄𝐓 𝟐𝟎𝟐𝟔 𝐂𝐃𝐏 𝐏𝐥𝐚𝐲𝐥𝐢𝐬𝐭 𝐛𝐲 𝐃𝐞𝐞𝐩𝐚𝐥𝐢 𝐌𝐚'𝐚𝐦 - https://www.youtube.com/playlist?list=PLapuBWGrq2_tyGB07k6STpHYgEPs_xAGk
+
+👉𝐂𝐓𝐄𝐓 𝟐𝟎𝟐𝟔 𝐌𝐚𝐭𝐡𝐬 𝐏𝐥𝐚𝐲𝐥𝐢𝐬𝐭 - https://www.youtube.com/playlist?list=PLapuBWGrq2_tsqaUAfCLxNY8cQTG9wqas
+
+👉𝐂𝐓𝐄𝐓 𝟐𝟎𝟐𝟔  𝐒𝐜𝐢𝐞𝐧𝐜𝐞 𝐏𝐥𝐚𝐲𝐥𝐢𝐬𝐭 - https://www.youtube.com/playlist?list=PLapuBWGrq2_sHlcuIjbzqe9ab7WJkLKfQ
+
+👉𝐂𝐓𝐄𝐓 𝟐𝟎𝟐𝟔 𝐇𝐢𝐧𝐝𝐢 𝐏𝐥𝐚𝐲𝐥𝐢𝐬𝐭 - https://www.youtube.com/playlist?list=PLapuBWGrq2_ukEWGkN10LCAJU1Y2ARr6I 
+
+=====================================
+𝐒𝐨𝐜𝐢𝐚𝐥 𝐌𝐞𝐝𝐢𝐚 𝐋𝐢𝐧𝐤𝐬 - 
+✅𝐓𝐞𝐥𝐞𝐠𝐫𝐚𝐦 - https://t.me/teachingparikshaofficial
+✅𝐈𝐧𝐬𝐭𝐚𝐠𝐫𝐚𝐦 - https://www.instagram.com/teachingpariksha/
+✅𝐅𝐚𝐜𝐞𝐛𝐨𝐨𝐤 - https://www.facebook.com/TeachingPariksha/
+=====================================
+𝐅𝐨𝐫 𝐀𝐧𝐲 𝐝𝐨𝐮𝐛𝐭 𝐚𝐧𝐝 𝐐𝐮𝐞𝐫𝐲 𝐊𝐢𝐧𝐝𝐥𝐲 𝐂𝐚𝐥𝐥 𝐨𝐫 𝐖𝐡𝐚𝐭𝐬𝐀𝐩𝐩 𝐮𝐬 𝐨𝐧 - 7611-101-101  and   9697-888-444
+====================================
+#ctet #cdp #ctetcdp #ctet #ctet2025 #ctet2026 #ctetpreparation #ctetpaper1 #ctetpaper2 #cdpforctetinhindi #ctetnews #ctetexam #teachingpariksha #ctetsyllabus #ctetpaper #ctetnotification",Danish Sir,was_live,2025-11-27,08:20:29,11,0.0,0.0,0.0,0.0,https://www.youtube.com/watch?v=3Jtq4Fs9wQI,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+gwGptarwiyQ,BPSC AEDO and BPSC TRE 4.0 GK GS Marathon | Bihar Special for BPSC AEDO by Danish Sir | BPSC,"BPSC AEDO GK GS Marathon | Bihar AEDO Special GK GS Class by Danish Sir | Bihar TRE 4.0 | BPSC ⁨@teachingpariksha⁩  
+
+🔖𝐁𝐏𝐒𝐂 𝐀𝐄𝐃𝐎 𝐂𝐫𝐚𝐬𝐡 𝐂𝐨𝐮𝐫𝐬𝐞  (𝐂𝐥𝐢𝐜𝐤 𝐇𝐞𝐫𝐞) - https://teachingpariksha.com/new-courses/710
+
+🔖𝐁𝐏𝐒𝐂 𝐀𝐄𝐃𝐎 𝐂𝐨𝐮𝐫𝐬𝐞  (𝐂𝐥𝐢𝐜𝐤 𝐇𝐞𝐫𝐞) -  https://www.teachingpariksha.com/new-courses/590
+
+📌𝐁𝐏𝐒𝐂 𝐀𝐄𝐃𝐎 𝐒𝐞𝐥𝐞𝐜𝐭𝐢𝐨𝐧 𝐅𝐨𝐫𝐦 𝟐𝟎𝟐𝟔: https://forms.gle/TDdj2WXpmWqLSd987
+
+🔖𝐓𝐨 𝐛𝐮𝐲🎯𝐁𝐏𝐒𝐂 𝐓𝐑𝐄 𝟒.𝟎 𝐂𝐨𝐮𝐫𝐬𝐞 (𝐂𝐥𝐢𝐜𝐤 𝐇𝐞𝐫𝐞) -  https://linktr.ee/teachingpariksha
+
+===================================
+
+Prepare for BPSC AEDO and BPSC TRE 4.0 with this GK GS Marathon by Danish Sir. Covering Bihar Special GK, General Studies (Samanya Adhyayan), and exam-focused GS topics, this class is perfect for BPSC AEDO, BEO, and Bihar Teacher 4.0 preparation. Don’t miss this complete guide for success in upcoming exams.
+
+More Info:
+1. GK GS Marathon Class for BPSC TRE 4.0 Exam & BPSC AEDO
+2. BPSC TRE 4.0 General Studies & Bihar Special GK
+3. Complete GK GS Preparation for BPSC AEDO & Bihar Teacher
+4. Bihar Special GK GS for BPSC AEDO & BPSC TRE 4.0
+5. General Studies by Danish Sir
+
+===================================
+✅ 𝐓𝐞𝐚𝐜𝐡𝐢𝐧𝐠 𝐏𝐚𝐫𝐢𝐤𝐬𝐡𝐚 𝐖𝐡𝐚𝐭𝐬𝐀𝐩𝐩 𝐂𝐡𝐚𝐧𝐧𝐞𝐥 𝐋𝐢𝐧𝐤 -https://whatsapp.com/channel/0029Va8RjEP3WHTeA7aX4y1n
+
+✅ 𝐓𝐞𝐚𝐜𝐡𝐢𝐧𝐠 𝐏𝐚𝐫𝐢𝐤𝐬𝐡𝐚 𝐀𝐩𝐩 𝐋𝐢𝐧𝐤 -https://play.google.com/store/apps/details?id=com.teachingpariksha.courses&hl=en&gl=US
+===================================
+
+🚩𝐁𝐏𝐒𝐂 𝐓𝐑𝐄 𝟒.𝟎 𝐏𝐥𝐚𝐲𝐥𝐢𝐬𝐭:
+
+⚡𝐁𝐏𝐒𝐂 𝐓𝐑𝐄 𝟒.𝟎 𝐆𝐊/𝐆𝐒 𝐏𝐥𝐚𝐲𝐥𝐢𝐬𝐭  - https://www.youtube.com/playlist?list=PLapuBWGrq2_uljPz2B0eixacP9Ksp9KHC
+⚡𝐁𝐏𝐒𝐂 𝐓𝐑𝐄 𝟒.𝟎 𝐒𝐜𝐢𝐞𝐧𝐜𝐞 𝐏𝐥𝐚𝐲𝐥𝐢𝐬𝐭  - https://www.youtube.com/playlist?list=PLapuBWGrq2_uukhmlrh4vuxWwSE2Fy4Bk
+⚡𝐁𝐏𝐒𝐂 𝐓𝐑𝐄 𝟒.𝟎 𝐌𝐚𝐭𝐡𝐬 𝐏𝐥𝐚𝐲𝐥𝐢𝐬𝐭 - https://www.youtube.com/playlist?list=PLapuBWGrq2_uwmBOoc_RLJskcQE17nwyV
+⚡𝐁𝐏𝐒𝐂 𝐓𝐑𝐄 𝟒.𝟎 𝐇𝐢𝐧𝐝𝐢 𝐏𝐥𝐚𝐲𝐥𝐢𝐬𝐭 - https://www.youtube.com/playlist?list=PLapuBWGrq2_saC8FziwJRKgBFMsdy_-EP
+⚡𝐁𝐏𝐒𝐂 𝐓𝐑𝐄 𝟒.𝟎 𝐑𝐞𝐚𝐬𝐨𝐧𝐢𝐧𝐠 𝐏𝐥𝐚𝐲𝐥𝐢𝐬𝐭 - https://www.youtube.com/playlist?list=PLapuBWGrq2_tJlf6qw2dryF6jJ9MTcMCN
+⚡𝐁𝐏𝐒𝐂 𝐓𝐑𝐄 𝟒.𝟎 𝐄𝐧𝐠𝐥𝐢𝐬𝐡 𝐏𝐥𝐚𝐲𝐥𝐢𝐬𝐭 - https://www.youtube.com/playlist?list=PLapuBWGrq2_szsipIV3l4IcTFDhS4L0pt
+
+====================================
+𝐅𝐀𝐐
+1. What subjects are covered in Danish Sir’s BPSC TRE 4.0 & AEDO GK GS classes?
+2. How is the BPSC AEDO Samanya Adhyayan different from BPSC TRE 4.0 preparation?
+3. Why is Bihar Special GK important for BPSC Teacher and AEDO exams?
+4. What topics of History, Geography, and Polity are included in this series?
+5. How does Danish Sir simplify GK GS for better understanding?
+6. Can these classes help in both BPSC TRE 4.0 and BPSC AEDO exams?
+7. Where can students watch the complete GK GS classes by Danish Sir?
+8. How often are new GK GS practice questions shared in this series?
+9. What makes this GK GS series unique for Bihar Teacher aspirants?
+10. How can I combine these classes with my self-study for maximum results?
+===================================
+✅𝐒𝐎𝐂𝐈𝐀𝐋 𝐌𝐄𝐃𝐈𝐀 𝐋𝐈𝐍𝐊𝐒 -
+👉Instagram - https://www.instagram.com/teachingpariksha/
+👉Facebook - https://www.facebook.com/TeachingPariksha/
+===================================
+#bpsc #bpscaedo #bpscexam #bpscaedogkgs #bpscteacher #teachingexams #bpsctre4 #bpsctre #teachingpariksha #gk #gs #gkgs #generalstudies #bpscbyteachingpariksha #gkgsbydanishsir #bpschistory #bpscgeography #bpscpolity #bpsceconomics 
+====================================
+📞𝐅𝐨𝐫 𝐀𝐧𝐲 𝐃𝐨𝐮𝐛𝐭 𝐚𝐧𝐝 𝐐𝐮𝐞𝐫𝐲 𝐊𝐢𝐧𝐝𝐥𝐲 𝐂𝐚𝐥𝐥 𝐨𝐫 𝐖𝐡𝐚𝐭𝐬𝐀𝐩𝐩 𝐮𝐬 𝐨𝐧 -  7611-101-101  and   9697-888-444
+====================================",Danish Sir,was_live,2025-12-07,10:15:50,1,0.0,0.0,0.0,0.0,https://www.youtube.com/watch?v=gwGptarwiyQ,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+hFDvyNck6kg,CTET 2026 EVS Class | CTET Paper 1 | CTET Paper 1 EVS | CTET EVS By Mona Ma'am @teachingpariksha ​,,Mona Ma'am,was_live,,,,0.0,0.0,0.0,0.0,https://www.youtube.com/watch?v=hFDvyNck6kg,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+BRPuOnFThF8,KVS/NVS Hindi Marathon | KVS Hindi Class | KVS NVS Tier 1 Hindi | Hindi for KVS 2025 | KVS,,Unknown,was_live,,,,1129.0,0.0,0.0,2799.0,https://www.youtube.com/watch?v=BRPuOnFThF8,0.0,46.65,24.20150053590568,1129.0,0.0,0.0,0.0
+urwShppDMHk,CTET SST Paper 2 | CTET 2025 NCERT Social Science Revision Class | CTET Paper 2 SST,,Unknown,was_live,,,,2667.0,0.0,0.0,1814.0,https://www.youtube.com/watch?v=urwShppDMHk,0.0,30.233333333333334,88.21389195148842,2667.0,0.0,0.0,0.0
+s0RLyMoB-8A,CTET Feb 2026 Maths Marathon | CTET Maths Paper 2 PYQs Marathon | CTET Maths by Pawan Sir #ctet,,Pawan Sir,was_live,,,,682.0,0.0,0.0,3055.0,https://www.youtube.com/watch?v=s0RLyMoB-8A,0.0,50.916666666666664,13.39443535188216,682.0,0.0,0.0,0.0
+9DNa3xt8GDg,CTET Feb 2026 Science NCERT Based Class | CTET Science Paper 2 PYQs Marathon | CTET Science #6,,Unknown,was_live,,,,1151.0,0.0,0.0,3624.0,https://www.youtube.com/watch?v=9DNa3xt8GDg,0.0,60.4,19.05629139072848,1151.0,0.0,0.0,0.0
+OUjzEmX-JeU,CTET 2026 CDP | CTET CDP Class | CTET CDP PYQ's Analysis Series | CTET CDP Marathon by Deepali Ma'am,,Deepali Ma'am,was_live,,,,2330.0,0.0,0.0,3562.0,https://www.youtube.com/watch?v=OUjzEmX-JeU,0.0,59.36666666666667,39.24761370016844,2330.0,0.0,0.0,0.0
+ruclEHT40-I,KVS/NVS Numerical Ability Marathon | KVS Numerical Ability Class | KVS NVS Tier 1 Numerical Ability,,Unknown,was_live,,,,2215.0,0.0,0.0,3048.0,https://www.youtube.com/watch?v=ruclEHT40-I,0.0,50.8,43.602362204724415,2215.0,0.0,0.0,0.0
+NdxRppKfBZ8,KVS 2025 Reasoning Class | KVS PRT Reasoning Marathon | Reasoning by Kajal Ma'am | KVS 2025 | #kvs,,Kajal Ma'am,was_live,,,,2745.0,0.0,0.0,3850.0,https://www.youtube.com/watch?v=NdxRppKfBZ8,0.0,64.16666666666667,42.77922077922078,2745.0,0.0,0.0,0.0
+UgDVU_W-Ryw,BPSC AEDO Biggest Announcement By Teaching Pariksha | BPSC AEDO Exam #bpsc,,Unknown,was_live,,,,12483.0,0.0,0.0,1009.0,https://www.youtube.com/watch?v=UgDVU_W-Ryw,0.0,16.816666666666666,742.2993062438057,12483.0,0.0,0.0,0.0
+QtyUgu6FZfA,CTET Feb 2026 Science NCERT Based Class | CTET Science Paper 2 PYQs Marathon | CTET Science #5,,Unknown,was_live,,,,2365.0,0.0,0.0,3722.0,https://www.youtube.com/watch?v=QtyUgu6FZfA,0.0,62.03333333333333,38.12466415905428,2365.0,0.0,0.0,0.0
+b4VjO7ykH9Q,KVS/NVS Numerical Ability Marathon | KVS Numerical Ability Class | KVS NVS Tier 1 Numerical Ability,,Unknown,was_live,,,,4643.0,0.0,0.0,3081.0,https://www.youtube.com/watch?v=b4VjO7ykH9Q,0.0,51.35,90.4186952288218,4643.0,0.0,0.0,0.0
+we1iaPL_eKI,BPSC AEDO Official Exam Date Out | AEDO New Form Fill Up Date | AEDO Bihar Vacancy 2025 Latest News,,Unknown,was_live,,,,29870.0,0.0,0.0,836.0,https://www.youtube.com/watch?v=we1iaPL_eKI,0.0,13.933333333333334,2143.77990430622,29870.0,0.0,0.0,0.0
+jpbwsucozdo,UP LT Grade Paper Analysis | UP LT Grade 2025 | GK GS Complete Analysis by Danish Sir,,Danish Sir,was_live,,,,25252.0,0.0,0.0,3480.0,https://www.youtube.com/watch?v=jpbwsucozdo,0.0,58.0,435.37931034482756,25252.0,0.0,0.0,0.0
+_dvQPhmUvXU,KVS 2025 Computer Marathon | KVS Computer Literacy Marathon Class | KVS NVS Tier 1 Computer Class,,Unknown,was_live,,,,11112.0,0.0,0.0,7779.0,https://www.youtube.com/watch?v=_dvQPhmUvXU,0.0,129.65,85.70767450829155,11112.0,0.0,0.0,0.0
+f14DadTcoz4,CTET Feb 2026 Hindi Class | CTET Paper 1 & 2 Hindi Marathon | CTET Hindi By Isha Ma'am #ctet,,Isha Ma'am,was_live,,,,3544.0,0.0,0.0,4814.0,https://www.youtube.com/watch?v=f14DadTcoz4,0.0,80.23333333333333,44.17116742833402,3544.0,0.0,0.0,0.0
+YAh4SqTifQs,CTET 2026 EVS Class | CTET Paper 1 | CTET Paper 1 EVS | CTET EVS By Mona Ma'am @teachingpariksha ​,,Mona Ma'am,was_live,,,,4259.0,0.0,0.0,3553.0,https://www.youtube.com/watch?v=YAh4SqTifQs,0.0,59.21666666666667,71.9223191669012,4259.0,0.0,0.0,0.0
+ZU9VWyfvlA8,KVS/NVS Hindi Marathon | KVS Hindi Class | KVS NVS Tier 1 Hindi | Hindi for KVS 2025 | KVS,,Unknown,was_live,,,,6162.0,0.0,0.0,2864.0,https://www.youtube.com/watch?v=ZU9VWyfvlA8,0.0,47.733333333333334,129.09217877094972,6162.0,0.0,0.0,0.0
