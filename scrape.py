@@ -5,8 +5,9 @@ YouTube Livestream Data Extractor - CSV Only (GitHub Actions Safe)
 - Skips scheduled/upcoming streams (only already streamed)
 - Adds: teacher_name, live_status, published_at, published_time,
          likes, comments, days_since_published
-- Teacher name is detected from title; if Unknown, we also search in
-  description (fetched from ytInitialPlayerResponse).
+- Teacher name is detected:
+    1) Directly from title (Danish, Isha, Kajal, etc.)
+    2) If Unknown, from subject/patterns in title using get_teacher()
 - Adds derived metrics:
     engagement_score, duration_minutes, views_per_minute, views_per_day,
     engagement_per_view, like_rate, comment_rate
@@ -46,7 +47,6 @@ print("✅ HTTP session configured")
 
 def extract_json_from_html(html, var_name='ytInitialData'):
     """Generic extractor for embedded JSON blobs like ytInitialData / ytInitialPlayerResponse."""
-    # Pattern 1: var ytInitialData = {...};
     pattern = rf'var {var_name}\s*=\s*(\{{.*?\}});'
     match = re.search(pattern, html, re.DOTALL)
     if match:
@@ -55,7 +55,6 @@ def extract_json_from_html(html, var_name='ytInitialData'):
         except Exception:
             pass
 
-    # Fallback: search from first occurrence of the var name and parse braces
     idx = html.find(var_name)
     if idx == -1:
         return None
@@ -110,7 +109,9 @@ def parse_duration_text(text):
     return parts[0] if parts else 0
 
 
-TEACHER_MAP = {
+# ----- Teacher detection -----
+# 1) Direct name detection
+TEACHER_MAP_DIRECT = {
     "danish": "Danish Sir",
     "deepali": "Deepali Ma'am",
     "isha": "Isha Ma'am",
@@ -120,17 +121,17 @@ TEACHER_MAP = {
     "pawan": "Pawan Sir",
     "narjis": "Narjis Ma'am",
     "sachin": "Sachin Sir",
-    "abha": "Abha Ma'am"
+    "abha": "Abha Ma'am",
+    "pooja": "Pooja Ma'am",  # for direct "Pooja Ma'am" in title if present
 }
 
-def detect_teacher_in_text(text: str) -> str:
-    """Search for teacher keywords in a given text."""
+def detect_teacher_by_name(text: str) -> str:
+    """Direct name-based detection in title."""
     if not text:
         return "Unknown"
     low = text.lower()
 
-    # Simple containment
-    for key, value in TEACHER_MAP.items():
+    for key, value in TEACHER_MAP_DIRECT.items():
         if key in low:
             return value
 
@@ -138,93 +139,76 @@ def detect_teacher_in_text(text: str) -> str:
     m = re.search(r'([A-Za-z]+)\s+(sir|ma[\'a]?am)', low)
     if m:
         name = m.group(1).lower()
-        if name in TEACHER_MAP:
-            return TEACHER_MAP[name]
+        if name in TEACHER_MAP_DIRECT:
+            return TEACHER_MAP_DIRECT[name]
 
     return "Unknown"
 
 
-def extract_teacher_name(title: str, description: str = "") -> str:
+# 2) Your subject-based mapping, used when direct name detection fails
+def get_teacher(t: str) -> str:
+    t = t.lower()  # Normalize to lowercase for easier matching
+
+    # --- EVS & Science ---
+    # Mona Ma'am for Core EVS
+    if " evs" in t or "environmental studies" in t or "environment studies" in t:
+        return "Mona Ma'am"
+    
+    # Kuldeep Sir for General Science (Physics/Chem/Bio)
+    # Adding this prevents "Science" from being unmapped or mislabeled
+    if "science" in t and "social" not in t: 
+        return "Kuldeep Sir"
+
+    # --- Languages ---
+    # Hindi -> Isha Ma'am
+    if " hindi" in t:
+        return "Isha Ma'am"
+
+    # English -> Pooja Ma'am (Updated from Narjis)
+    if " english" in t:
+        return "Pooja Ma'am"
+
+    # --- Reasoning & Computer ---
+    # Kajal Ma'am covers both Reasoning and Computer recently
+    if " reasoning" in t or "logical" in t or "mental ability" in t:
+        return "Kajal Ma'am"
+
+    if " computer" in t:
+        return "Kajal Ma'am"  # Updated from Abha Ma'am
+
+    # --- Maths ---
+    # Maths -> Pawan Sir
+    if " maths" in t or " math " in t or "mathematics" in t or "numerical" in t or "quant" in t:
+        return "Pawan Sir"
+
+    # --- SST / GK / CDP ---
+    # Danish Sir covers the broad "General Awareness" and "Child Dev" spectrum
+    if " cdp" in t or "child development" in t:
+        return "Danish Sir"
+        
+    if " gk" in t or "general knowledge" in t or "current affairs" in t or " gs" in t:
+        return "Danish Sir"
+
+    # SST -> Danish Sir (Updated from Sachin Sir)
+    if " sst " in t or "social science" in t or "social studies" in t:
+        return "Danish Sir"
+
+    return "Unknown"
+
+
+def extract_teacher_name_from_title(title: str) -> str:
     """
-    First try title; if Unknown, try description with same keyword logic.
+    Combined logic:
+    1) Try direct name in title
+    2) If Unknown, try subject-based mapping using get_teacher()
     """
-    name = detect_teacher_in_text(title or "")
+    # 1. Direct detection
+    name = detect_teacher_by_name(title or "")
     if name != "Unknown":
         return name
-    return detect_teacher_in_text(description or "")
 
-
-def extract_description_for_teacher(html: str) -> str:
-    """
-    Get description from ytInitialPlayerResponse.videoDetails.shortDescription,
-    with regex fallbacks. Used ONLY for teacher detection (not saved).
-    """
-    # 1) Try ytInitialPlayerResponse JSON
-    try:
-        player_data = extract_json_from_html(html, 'ytInitialPlayerResponse')
-        desc = safe_get(player_data, 'videoDetails', 'shortDescription', default="")
-        if isinstance(desc, str) and desc.strip():
-            # Clean escapes
-            desc = desc.replace('\\n', '\n')
-            desc = desc.replace('\\u0026', '&')
-            desc = desc.replace('\\u003d', '=')
-            desc = desc.replace('\\u003c', '<')
-            desc = desc.replace('\\u003e', '>')
-            desc = desc.replace('\\"', '"')
-            desc = desc.replace('\\\\', '\\')
-            return desc.strip()
-    except Exception:
-        pass
-
-    # 2) Regex primary: shortDescription block
-    try:
-        m1 = re.search(r'"shortDescription":"(.*?)","isCrawlable"', html, re.DOTALL)
-        if m1:
-            desc = m1.group(1)
-            desc = desc.replace('\\n', '\n')
-            desc = desc.replace('\\u0026', '&')
-            desc = desc.replace('\\u003d', '=')
-            desc = desc.replace('\\u003c', '<')
-            desc = desc.replace('\\u003e', '>')
-            desc = desc.replace('\\"', '"')
-            desc = desc.replace('\\\\', '\\')
-            return desc.strip()
-    except Exception:
-        pass
-
-    # 3) Regex fallback: videoDetails.shortDescription
-    try:
-        m2 = re.search(r'"videoDetails":\{.*?"shortDescription":"(.*?)"', html, re.DOTALL)
-        if m2:
-            desc = m2.group(1)
-            desc = desc.replace('\\n', '\n')
-            desc = desc.replace('\\u0026', '&')
-            desc = desc.replace('\\u003d', '=')
-            desc = desc.replace('\\u003c', '<')
-            desc = desc.replace('\\u003e', '>')
-            desc = desc.replace('\\"', '"')
-            desc = desc.replace('\\\\', '\\')
-            return desc.strip()
-    except Exception:
-        pass
-
-    # 4) Tiny fallback: description.simpleText
-    try:
-        m3 = re.search(r'"description":\{"simpleText":"(.*?)"\}', html, re.DOTALL)
-        if m3:
-            desc = m3.group(1)
-            desc = desc.replace('\\n', '\n')
-            desc = desc.replace('\\u0026', '&')
-            desc = desc.replace('\\u003d', '=')
-            desc = desc.replace('\\u003c', '<')
-            desc = desc.replace('\\u003e', '>')
-            desc = desc.replace('\\"', '"')
-            desc = desc.replace('\\\\', '\\')
-            return desc.strip()
-    except Exception:
-        pass
-
-    return ""
+    # 2. Subject-based heuristic
+    return get_teacher(title or "")
 
 
 def days_since(date_str, fmt="%Y-%m-%d"):
@@ -309,7 +293,6 @@ def extract_video_details(video_url):
     - published_at (ISO date)
     - published_time (HH:MM:SS)
     - days_since_published
-    - description (for teacher refinement only; NOT saved)
     """
     try:
         r = session.get(video_url, timeout=30)
@@ -335,13 +318,10 @@ def extract_video_details(video_url):
 
         days = days_since(published_at) if published_at else None
 
-        # Description (for teacher detection only)
-        description = extract_description_for_teacher(html)
-
-        return likes, comments, published_at, published_time, days, description
+        return likes, comments, published_at, published_time, days
 
     except Exception:
-        return 0, 0, "", "", None, ""
+        return 0, 0, "", "", None
 
 
 def main():
@@ -372,10 +352,10 @@ def main():
         duration_sec = parse_duration_text(len_text)
 
         video_url = f"https://www.youtube.com/watch?v={video_id}"
-        likes, comments, published_at, published_time, days_since_pub, description = extract_video_details(video_url)
+        likes, comments, published_at, published_time, days_since_pub = extract_video_details(video_url)
 
-        # Teacher detection: title first, then description if still Unknown
-        teacher_name = extract_teacher_name(title, description)
+        # Teacher detection from title (direct name → subject pattern)
+        teacher_name = extract_teacher_name_from_title(title)
 
         livestream_data.append({
             "video_id": video_id,
