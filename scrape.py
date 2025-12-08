@@ -130,23 +130,46 @@ def extract_teacher_name(title):
 
 def extract_description_from_html(html):
     """
-    Try to extract full description from shortDescription in the HTML.
+    Robust multi-fallback YouTube description extractor.
+    Works for almost all watch page variants.
     """
     try:
-        # shortDescription appears in playerResponse
-        m = re.search(r'"shortDescription":"(.*?)","isCrawlable"', html, re.DOTALL)
-        if not m:
-            return ""
-        desc = m.group(1)
-        # Unescape common sequences
+        # ✅ 1. PRIMARY: shortDescription inside player response
+        m1 = re.search(r'"shortDescription":"(.*?)","isCrawlable"', html, re.DOTALL)
+        if m1:
+            desc = m1.group(1)
+
+        else:
+            # ✅ 2. FALLBACK: from videoDetails.description
+            m2 = re.search(r'"videoDetails":\{.*?"shortDescription":"(.*?)"', html, re.DOTALL)
+            if m2:
+                desc = m2.group(1)
+            else:
+                # ✅ 3. FALLBACK: metadata panel
+                m3 = re.search(r'"description":\{"simpleText":"(.*?)"\}', html, re.DOTALL)
+                if m3:
+                    desc = m3.group(1)
+                else:
+                    return ""
+
+        # ✅ CLEAN-UP (VERY IMPORTANT)
         desc = desc.replace('\\n', '\n')
         desc = desc.replace('\\u0026', '&')
+        desc = desc.replace('\\u003d', '=')
+        desc = desc.replace('\\u003c', '<')
+        desc = desc.replace('\\u003e', '>')
         desc = desc.replace('\\"', '"')
         desc = desc.replace('\\\\', '\\')
-        # Optional: trim very long descriptions if needed
+
+        # ✅ LIMIT SIZE (prevents sheet overflow & CSV corruption)
+        if len(desc) > 6000:
+            desc = desc[:6000] + "...(trimmed)"
+
         return desc.strip()
-    except:
+
+    except Exception as e:
         return ""
+
 
 
 def days_since(date_str, fmt="%Y-%m-%d"):
@@ -388,3 +411,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
