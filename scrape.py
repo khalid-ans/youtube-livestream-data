@@ -1,24 +1,27 @@
 """
-YouTube Livestream Data Extractor - Selenium + CSV (GitHub Actions Safe-ish)
-=================================================================
-- Extracts latest livestream data (from channel /streams or /videos)
+YouTube Livestream Data Extractor - Selenium DOM + CSV
+=====================================================
+- Extracts latest livestream data from a channel
 - Skips scheduled/upcoming streams
-- Uses Selenium headless Chrome to load each watch page:
-    -> more reliable likes & comments from full HTML/JSON
-- Adds: teacher_name, live_status, published_at, published_time,
-         days_since_published, likes, comments
+- Uses Selenium (headless Chrome) to:
+    • Read likes from the like button (aria-label / text)
+    • Read comments from the comments header ("X Comments")
+- Adds:
+    teacher_name, live_status, published_at, published_time,
+    days_since_published, likes, comments
 - Teacher name:
     1) Direct name in title (Danish, Isha, etc.)
-    2) If Unknown -> subject-based mapping (get_teacher)
+    2) Else subject-based mapping (get_teacher)
 - Derived metrics:
     engagement_score, duration_minutes, views_per_minute, views_per_day,
     engagement_per_view, like_rate, comment_rate
-- Always creates CSV: data/latest_20_livestreams_precise.csv
+- Always creates CSV:
+    data/latest_20_livestreams_precise.csv
 """
 
+import os
 import re
 import json
-import os
 import time
 import warnings
 from datetime import datetime, timezone, date, timedelta
@@ -28,12 +31,12 @@ import requests
 
 warnings.filterwarnings("ignore")
 
-# ================ CONFIG =================
+# ================ CONFIG ================
 
 CHANNEL_URL = "https://www.youtube.com/@teachingpariksha"
 TARGET_LIVESTREAMS = 20
 
-# ================ HTTP SESSION (for channel pages) ================
+# ================ HTTP SESSION (channel pages) ================
 
 session = requests.Session()
 session.headers.update({
@@ -42,15 +45,18 @@ session.headers.update({
                   "Chrome/120.0.0.0 Safari/537.36",
     "Accept-Language": "en-US,en;q=0.5",
 })
-
 print("✅ HTTP session configured")
 
-# ================ SELENIUM SETUP (for watch pages) ================
+# ================ SELENIUM (watch pages) ================
 
 driver = None
 try:
     from selenium import webdriver
     from selenium.webdriver.chrome.options import Options
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions as EC
+    from selenium.common.exceptions import TimeoutException
 
     def init_driver():
         opts = Options()
@@ -70,9 +76,9 @@ try:
 
 except ImportError:
     driver = None
-    print("⚠️ selenium package not installed, using requests-only mode")
+    print("⚠️ selenium not installed, using requests-only mode (likes/comments may be 0)")
 
-# ================ HELPERS =================
+# ================ GENERIC HELPERS ================
 
 def extract_json_from_html(html, var_name="ytInitialData"):
     pattern = rf"var {var_name}\s*=\s*(\{{.*?\}});"
@@ -99,7 +105,7 @@ def extract_json_from_html(html, var_name="ytInitialData"):
             depth -= 1
             if depth == 0:
                 try:
-                    return json.loads(html[start: i + 1])
+                    return json.loads(html[start:i+1])
                 except Exception:
                     return None
     return None
@@ -131,12 +137,12 @@ def parse_duration_text(text):
         return 0
     parts = [int(p) for p in text.split(":") if p.isdigit()]
     if len(parts) == 3:
-        return parts[0] * 3600 + parts[1] * 60 + parts[2]
+        return parts[0]*3600 + parts[1]*60 + parts[2]
     if len(parts) == 2:
-        return parts[0] * 60 + parts[1]
+        return parts[0]*60 + parts[1]
     return parts[0] if parts else 0
 
-# ----- Teacher detection -----
+# ================ TEACHER MAPPING ================
 
 TEACHER_MAP_DIRECT = {
     "danish": "Danish Sir",
@@ -212,6 +218,7 @@ def extract_teacher_name_from_title(title: str) -> str:
         return name
     return get_teacher(title or "")
 
+# ================ DATE HELPERS ================
 
 def parse_relative_published(text: str):
     if not text:
@@ -242,6 +249,7 @@ def parse_relative_published(text: str):
     pub_date = today - timedelta(days=days_offset)
     return pub_date.strftime("%d-%m-%Y"), days_offset
 
+# ================ FILTER UPCOMING ================
 
 def is_scheduled_or_upcoming(video):
     if safe_get(video, "upcomingEventData") is not None:
@@ -270,7 +278,7 @@ def is_scheduled_or_upcoming(video):
 
     return False
 
-# ================ SCRAPER: CHANNEL TABS =================
+# ================ CHANNEL SCRAPER ================
 
 def fetch_channel_videos(url):
     tabs = [f"{url}/streams", f"{url}/videos", url]
@@ -302,103 +310,84 @@ def fetch_channel_videos(url):
     return []
 
 
-# ================ SCRAPER: WATCH PAGE (Selenium) =================
+# ================ WATCH PAGE SCRAPER (DOM) ================
 
 def extract_video_details(video_url, approx_published_text=None):
     """
-    Uses Selenium (if available) to load full watch page HTML,
-    then extracts likes, comments, and date info from JSON/regex.
-    Falls back to requests-only if Selenium is not available.
+    Uses Selenium DOM (if available) to read:
+      - likes from like button aria-label/text
+      - comments from comments header
+    + date from uploadDate or approximate text.
     """
-    # 1) Get HTML either via Selenium or via requests
+    # --- Get rendered page ---
     html = ""
     if driver is not None:
         try:
             driver.get(video_url)
-            time.sleep(3)  # small wait for JS & JSON to load
+
+            wait = WebDriverWait(driver, 15)
+            wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+            time.sleep(2)  # allow counters to render
+
+            # Try to read likes from DOM
+            likes = 0
+
+            # Common selectors for like button
+            like_selectors = [
+                "ytd-toggle-button-renderer[is-icon-button] button",
+                "ytd-segmented-like-dislike-button-renderer button[aria-pressed]",
+                "ytd-toggle-button-renderer[is-icon-button] #button",
+                "button[aria-label*='like this video']",
+                "button[aria-label*='likes']",
+            ]
+            for sel in like_selectors:
+                try:
+                    el = driver.find_element(By.CSS_SELECTOR, sel)
+                    aria = el.get_attribute("aria-label") or ""
+                    txt = el.text or ""
+                    likes_candidate = parse_exact_count(aria) or parse_exact_count(txt)
+                    if likes_candidate > 0:
+                        likes = likes_candidate
+                        break
+                except Exception:
+                    continue
+
+            # Scroll to comments area
+            try:
+                driver.execute_script("window.scrollTo(0, document.documentElement.scrollHeight * 0.7);")
+                time.sleep(2)
+            except Exception:
+                pass
+
+            # Comments header: "#count > span"
+            comments = 0
+            try:
+                comments_el = WebDriverWait(driver, 10).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "ytd-comments-header-renderer #count span"))
+                )
+                comments_text = comments_el.text or ""
+                comments = parse_exact_count(comments_text)
+            except TimeoutException:
+                comments = 0
+
+            # Get HTML for uploadDate parsing
             html = driver.page_source
+
         except Exception as e:
             print(f"⚠️ Selenium error for {video_url}: {e}")
-    if not html:
+            likes = 0
+            comments = 0
+    else:
+        # No Selenium: fall back to requests-only
+        likes = 0
+        comments = 0
         try:
             r = session.get(video_url, timeout=30)
             html = r.text
         except Exception:
             html = ""
 
-    # ---------- Likes ----------
-    likes = 0
-    found_likes = False
-
-    yt_data = extract_json_from_html(html, "ytInitialData")
-    if yt_data:
-        results = safe_get(
-            yt_data,
-            "contents", "twoColumnWatchNextResults",
-            "results", "results", "contents",
-            default=[]
-        )
-        for item in results:
-            primary = item.get("videoPrimaryInfoRenderer")
-            if not primary:
-                continue
-
-            buttons = safe_get(
-                primary,
-                "videoActions", "menuRenderer", "topLevelButtons",
-                default=[]
-            )
-            for btn in buttons:
-                like_renderer = (
-                    safe_get(
-                        btn,
-                        "segmentedLikeDislikeButtonRenderer",
-                        "likeButton",
-                        "toggleButtonRenderer",
-                    )
-                    or safe_get(btn, "toggleButtonRenderer")
-                )
-                if like_renderer:
-                    access_label = safe_get(
-                        like_renderer,
-                        "defaultText", "accessibility",
-                        "accessibilityData", "label"
-                    )
-                    if access_label:
-                        likes = parse_exact_count(access_label)
-                        found_likes = True
-                        break
-            if found_likes:
-                break
-
-    if not found_likes and html:
-        like_match = re.search(r'"label":"([\d,]+)\s+likes"', html)
-        if like_match:
-            likes = parse_exact_count(like_match.group(1))
-
-    # ---------- Comments ----------
-    comments = 0
-    found_comments = False
-
-    if html:
-        comment_raw = re.search(r'"commentCount":"(\d+)"', html)
-        if comment_raw:
-            comments = int(comment_raw.group(1))
-            found_comments = True
-
-        if not found_comments:
-            comment_match = re.search(r'"text":"([\d,]+)\s+Comments"', html)
-            if comment_match:
-                comments = parse_exact_count(comment_match.group(1))
-                found_comments = True
-
-        if not found_comments:
-            comment_match2 = re.search(r'"simpleText":"([\d,]+)\s+Comments"', html)
-            if comment_match2:
-                comments = parse_exact_count(comment_match2.group(1))
-                found_comments = True
-
-    # ---------- Published date/time ----------
+    # --- Date logic (same as before) ---
     published_at = ""
     published_time = ""
     days = None
@@ -407,7 +396,7 @@ def extract_video_details(video_url, approx_published_text=None):
         upload_match = re.search(r'"uploadDate":\s*"([^"]+)"', html)
         if upload_match:
             try:
-                raw = upload_match.group(1)
+                raw = upload_match.group(1)  # 2025-02-10T15:30:00Z or 2025-02-10
                 iso = raw.replace("Z", "+00:00")
                 if "T" in iso:
                     dt = datetime.fromisoformat(iso)
@@ -437,7 +426,7 @@ def extract_video_details(video_url, approx_published_text=None):
     return likes, comments, published_at, published_time, days
 
 
-# ================ MAIN =================
+# ================ MAIN ================
 
 def main():
     videos_data = fetch_channel_videos(CHANNEL_URL)
@@ -490,7 +479,7 @@ def main():
             "url": video_url,
         })
 
-        time.sleep(0.5)
+        time.sleep(0.7)  # be gentle with YouTube
 
     print("✅ Final livestream rows (excluding scheduled/upcoming):", len(livestream_data))
 
@@ -558,8 +547,7 @@ def main():
         "like_rate",
         "comment_rate",
     ]
-    all_columns = base_columns + derived_columns
-    df = df[all_columns]
+    df = df[base_columns + derived_columns]
 
     os.makedirs("data", exist_ok=True)
     csv_path = "data/latest_20_livestreams_precise.csv"
@@ -571,7 +559,9 @@ def main():
         print(
             df[
                 ["title", "published_at", "days_since_published", "views", "likes", "comments"]
-            ].head(5).to_string()
+            ]
+            .head(5)
+            .to_string()
         )
 
     if driver is not None:
