@@ -2,8 +2,11 @@
 YouTube Livestream Data Extractor - CSV Only (GitHub Actions Safe)
 =================================================================
 - Extracts latest livestream data
-- Adds: teacher_name, live_status, published_date, likes, comments,
-         days_since_published
+- Adds: description, teacher_name, live_status, published_at, published_time,
+         likes, comments, days_since_published
+- Adds derived metrics:
+    engagement_score, duration_minutes, views_per_minute, views_per_day,
+    engagement_per_view, like_rate, comment_rate
 - Always creates CSV:
     data/latest_20_livestreams_precise.csv
 - NEVER crashes if no data is found
@@ -15,7 +18,7 @@ import json
 import os
 import requests
 import pandas as pd
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 import time
 import warnings
 
@@ -103,7 +106,7 @@ def parse_duration_text(text):
 
 
 def extract_teacher_name(title):
-    title = title.lower()
+    title_low = title.lower()
 
     teacher_map = {
         "danish": "Danish Sir",
@@ -119,10 +122,41 @@ def extract_teacher_name(title):
     }
 
     for key, value in teacher_map.items():
-        if key in title:
+        if key in title_low:
             return value
 
     return "Unknown"
+
+
+def extract_description_from_html(html):
+    """
+    Try to extract full description from shortDescription in the HTML.
+    """
+    try:
+        # shortDescription appears in playerResponse
+        m = re.search(r'"shortDescription":"(.*?)","isCrawlable"', html, re.DOTALL)
+        if not m:
+            return ""
+        desc = m.group(1)
+        # Unescape common sequences
+        desc = desc.replace('\\n', '\n')
+        desc = desc.replace('\\u0026', '&')
+        desc = desc.replace('\\"', '"')
+        desc = desc.replace('\\\\', '\\')
+        # Optional: trim very long descriptions if needed
+        return desc.strip()
+    except:
+        return ""
+
+
+def days_since(date_str, fmt="%Y-%m-%d"):
+    if not date_str:
+        return None
+    try:
+        d = datetime.strptime(date_str, fmt).date()
+    except Exception:
+        return None
+    return (date.today() - d).days
 
 # ================= SCRAPER =================
 
@@ -155,29 +189,48 @@ def fetch_channel_videos(url):
     return []
 
 
-def extract_likes_comments(video_url):
+def extract_video_details(video_url):
+    """
+    For a given video URL:
+    - likes
+    - comments
+    - published_at (ISO date)
+    - published_time (HH:MM:SS)
+    - days_since_published
+    - description
+    """
     try:
-        r = session.get(video_url)
+        r = session.get(video_url, timeout=30)
         html = r.text
 
+        # Likes
         likes_match = re.search(r'"label":"([\d,]+) likes"', html)
-        comments_match = re.search(r'"commentCount":"(\d+)"', html)
-
         likes = parse_exact_count(likes_match.group(1)) if likes_match else 0
+
+        # Comments
+        comments_match = re.search(r'"commentCount":"(\d+)"', html)
         comments = int(comments_match.group(1)) if comments_match else 0
 
+        # Upload date/time
         upload_match = re.search(r'"uploadDate":"([^"]+)"', html)
         if upload_match:
-            published_dt = datetime.fromisoformat(upload_match.group(1).replace("Z", "+00:00"))
+            dt = datetime.fromisoformat(upload_match.group(1).replace("Z", "+00:00"))
+            published_at = dt.strftime("%Y-%m-%d")
+            published_time = dt.strftime("%H:%M:%S")
         else:
-            published_dt = datetime.now(timezone.utc)
+            # If not found, leave blank
+            published_at = ""
+            published_time = ""
 
-        days_since = (datetime.now(timezone.utc) - published_dt).days
+        days = days_since(published_at) if published_at else None
 
-        return likes, comments, published_dt.strftime("%Y-%m-%d"), days_since
+        # Description
+        description = extract_description_from_html(html)
 
-    except:
-        return 0, 0, "", ""
+        return likes, comments, published_at, published_time, days, description
+
+    except Exception:
+        return 0, 0, "", "", None, ""
 
 
 def main():
@@ -206,15 +259,17 @@ def main():
         teacher_name = extract_teacher_name(title)
 
         video_url = f"https://www.youtube.com/watch?v={video_id}"
-        likes, comments, published_at, days_since = extract_likes_comments(video_url)
+        likes, comments, published_at, published_time, days_since_pub, description = extract_video_details(video_url)
 
         livestream_data.append({
             "video_id": video_id,
             "title": title,
+            "description": description,
             "teacher_name": teacher_name,
             "live_status": "was_live",
             "published_at": published_at,
-            "days_since_published": days_since,
+            "published_time": published_time,
+            "days_since_published": days_since_pub if days_since_pub is not None else "",
             "views": views,
             "likes": likes,
             "comments": comments,
@@ -222,18 +277,113 @@ def main():
             "url": video_url
         })
 
+        # Gentle delay to avoid hammering YouTube
         time.sleep(0.3)
 
     print("✅ Final livestream rows:", len(livestream_data))
 
-    # ✅ ALWAYS CREATE CSV (even if empty)
+    # ------- Build DataFrame & derived metrics -------
+
+    base_columns = [
+        "video_id", "title", "description", "teacher_name",
+        "live_status", "published_at", "published_time",
+        "days_since_published", "views", "likes", "comments",
+        "duration_seconds", "url"
+    ]
+
     df = pd.DataFrame(livestream_data)
 
+    # Ensure all base columns exist even if df is empty
+    for col in base_columns:
+        if col not in df.columns:
+            df[col] = ""
+
+    df = df[base_columns]
+
+    # Derived metrics
+    def safe_num(x):
+        try:
+            return float(x)
+        except:
+            return 0.0
+
+    # Fill NaNs with 0 for numeric operations
+    df['views'] = df['views'].fillna(0).astype(float)
+    df['likes'] = df['likes'].fillna(0).astype(float)
+    df['comments'] = df['comments'].fillna(0).astype(float)
+    df['duration_seconds'] = df['duration_seconds'].fillna(0).astype(float)
+
+    # engagement_score
+    df['engagement_score'] = df['likes'] + df['comments']
+
+    # duration_minutes
+    df['duration_minutes'] = df.apply(
+        lambda r: 0 if r['duration_seconds'] <= 0 else r['duration_seconds'] / 60.0,
+        axis=1
+    )
+
+    # views_per_minute
+    df['views_per_minute'] = df.apply(
+        lambda r: 0 if r['duration_minutes'] <= 0 else r['views'] / r['duration_minutes'],
+        axis=1
+    )
+
+    # views_per_day
+    def calc_views_per_day(row):
+        days = row['days_since_published']
+        if days in ["", None]:
+            return row['views']
+        try:
+            d = float(days)
+        except:
+            return row['views']
+        if d <= 0:
+            return row['views']
+        return row['views'] / d
+
+    df['views_per_day'] = df.apply(calc_views_per_day, axis=1)
+
+    # engagement_per_view
+    df['engagement_per_view'] = df.apply(
+        lambda r: 0 if r['views'] <= 0 else r['engagement_score'] / r['views'],
+        axis=1
+    )
+
+    # like_rate
+    df['like_rate'] = df.apply(
+        lambda r: 0 if r['views'] <= 0 else r['likes'] / r['views'],
+        axis=1
+    )
+
+    # comment_rate
+    df['comment_rate'] = df.apply(
+        lambda r: 0 if r['views'] <= 0 else r['comments'] / r['views'],
+        axis=1
+    )
+
+    # Final column order (base + derived)
+    derived_columns = [
+        "engagement_score",
+        "duration_minutes",
+        "views_per_minute",
+        "views_per_day",
+        "engagement_per_view",
+        "like_rate",
+        "comment_rate"
+    ]
+
+    all_columns = base_columns + derived_columns
+    df = df[all_columns]
+
+    # ✅ ALWAYS CREATE CSV (even if empty)
     os.makedirs("data", exist_ok=True)
     csv_path = "data/latest_20_livestreams_precise.csv"
     df.to_csv(csv_path, index=False, encoding="utf-8")
 
     print("✅ CSV file saved:", csv_path)
+    if not df.empty:
+        print("\n📊 SAMPLE:")
+        print(df[['title', 'teacher_name', 'views', 'likes', 'comments', 'views_per_day']].head(5).to_string())
 
 
 if __name__ == "__main__":
