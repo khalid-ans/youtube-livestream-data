@@ -127,7 +127,7 @@ def extract_teacher_name(title):
 
     return "Unknown"
 
-
+#Description extracter
 def extract_description_from_html(html):
     """
     Robust multi-fallback YouTube description extractor.
@@ -411,4 +411,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
