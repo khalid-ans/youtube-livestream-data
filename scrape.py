@@ -5,7 +5,8 @@ YouTube Livestream Data Extractor - CSV Only (GitHub Actions Safe)
 - Skips scheduled/upcoming streams (only already streamed)
 - Adds: teacher_name, live_status, published_at, published_time,
          likes, comments, days_since_published
-- Teacher name is detected from title; if Unknown, we also search in description.
+- Teacher name is detected from title; if Unknown, we also search in
+  description (fetched from ytInitialPlayerResponse).
 - Adds derived metrics:
     engagement_score, duration_minutes, views_per_minute, views_per_day,
     engagement_per_view, like_rate, comment_rate
@@ -44,6 +45,8 @@ print("✅ HTTP session configured")
 # ================= HELPERS =================
 
 def extract_json_from_html(html, var_name='ytInitialData'):
+    """Generic extractor for embedded JSON blobs like ytInitialData / ytInitialPlayerResponse."""
+    # Pattern 1: var ytInitialData = {...};
     pattern = rf'var {var_name}\s*=\s*(\{{.*?\}});'
     match = re.search(pattern, html, re.DOTALL)
     if match:
@@ -52,6 +55,7 @@ def extract_json_from_html(html, var_name='ytInitialData'):
         except Exception:
             pass
 
+    # Fallback: search from first occurrence of the var name and parse braces
     idx = html.find(var_name)
     if idx == -1:
         return None
@@ -120,13 +124,23 @@ TEACHER_MAP = {
 }
 
 def detect_teacher_in_text(text: str) -> str:
-    """Search for teacher keywords in a given text (lowercased)."""
+    """Search for teacher keywords in a given text."""
     if not text:
         return "Unknown"
     low = text.lower()
+
+    # Simple containment
     for key, value in TEACHER_MAP.items():
         if key in low:
             return value
+
+    # Pattern: 'Name Sir' / 'Name Ma'am'
+    m = re.search(r'([A-Za-z]+)\s+(sir|ma[\'a]?am)', low)
+    if m:
+        name = m.group(1).lower()
+        if name in TEACHER_MAP:
+            return TEACHER_MAP[name]
+
     return "Unknown"
 
 
@@ -137,49 +151,80 @@ def extract_teacher_name(title: str, description: str = "") -> str:
     name = detect_teacher_in_text(title or "")
     if name != "Unknown":
         return name
-    # second pass: description
     return detect_teacher_in_text(description or "")
 
 
-def extract_description_from_html(html):
+def extract_description_for_teacher(html: str) -> str:
     """
-    Robust multi-fallback YouTube description extractor.
-    Used ONLY for teacher-name refinement (not saved to CSV).
+    Get description from ytInitialPlayerResponse.videoDetails.shortDescription,
+    with regex fallbacks. Used ONLY for teacher detection (not saved).
     """
+    # 1) Try ytInitialPlayerResponse JSON
     try:
-        desc = None
+        player_data = extract_json_from_html(html, 'ytInitialPlayerResponse')
+        desc = safe_get(player_data, 'videoDetails', 'shortDescription', default="")
+        if isinstance(desc, str) and desc.strip():
+            # Clean escapes
+            desc = desc.replace('\\n', '\n')
+            desc = desc.replace('\\u0026', '&')
+            desc = desc.replace('\\u003d', '=')
+            desc = desc.replace('\\u003c', '<')
+            desc = desc.replace('\\u003e', '>')
+            desc = desc.replace('\\"', '"')
+            desc = desc.replace('\\\\', '\\')
+            return desc.strip()
+    except Exception:
+        pass
 
-        # 1) PRIMARY: shortDescription in player response
+    # 2) Regex primary: shortDescription block
+    try:
         m1 = re.search(r'"shortDescription":"(.*?)","isCrawlable"', html, re.DOTALL)
         if m1:
             desc = m1.group(1)
-        else:
-            # 2) FALLBACK: videoDetails.shortDescription
-            m2 = re.search(r'"videoDetails":\{.*?"shortDescription":"(.*?)"', html, re.DOTALL)
-            if m2:
-                desc = m2.group(1)
-            else:
-                # 3) FALLBACK: description.simpleText
-                m3 = re.search(r'"description":\{"simpleText":"(.*?)"\}', html, re.DOTALL)
-                if m3:
-                    desc = m3.group(1)
-
-        if not desc:
-            return ""
-
-        # Clean escape sequences
-        desc = desc.replace('\\n', '\n')
-        desc = desc.replace('\\u0026', '&')
-        desc = desc.replace('\\u003d', '=')
-        desc = desc.replace('\\u003c', '<')
-        desc = desc.replace('\\u003e', '>')
-        desc = desc.replace('\\"', '"')
-        desc = desc.replace('\\\\', '\\')
-
-        return desc.strip()
-
+            desc = desc.replace('\\n', '\n')
+            desc = desc.replace('\\u0026', '&')
+            desc = desc.replace('\\u003d', '=')
+            desc = desc.replace('\\u003c', '<')
+            desc = desc.replace('\\u003e', '>')
+            desc = desc.replace('\\"', '"')
+            desc = desc.replace('\\\\', '\\')
+            return desc.strip()
     except Exception:
-        return ""
+        pass
+
+    # 3) Regex fallback: videoDetails.shortDescription
+    try:
+        m2 = re.search(r'"videoDetails":\{.*?"shortDescription":"(.*?)"', html, re.DOTALL)
+        if m2:
+            desc = m2.group(1)
+            desc = desc.replace('\\n', '\n')
+            desc = desc.replace('\\u0026', '&')
+            desc = desc.replace('\\u003d', '=')
+            desc = desc.replace('\\u003c', '<')
+            desc = desc.replace('\\u003e', '>')
+            desc = desc.replace('\\"', '"')
+            desc = desc.replace('\\\\', '\\')
+            return desc.strip()
+    except Exception:
+        pass
+
+    # 4) Tiny fallback: description.simpleText
+    try:
+        m3 = re.search(r'"description":\{"simpleText":"(.*?)"\}', html, re.DOTALL)
+        if m3:
+            desc = m3.group(1)
+            desc = desc.replace('\\n', '\n')
+            desc = desc.replace('\\u0026', '&')
+            desc = desc.replace('\\u003d', '=')
+            desc = desc.replace('\\u003c', '<')
+            desc = desc.replace('\\u003e', '>')
+            desc = desc.replace('\\"', '"')
+            desc = desc.replace('\\\\', '\\')
+            return desc.strip()
+    except Exception:
+        pass
+
+    return ""
 
 
 def days_since(date_str, fmt="%Y-%m-%d"):
@@ -234,7 +279,7 @@ def fetch_channel_videos(url):
     for tab_url in tabs:
         print("Trying:", tab_url)
         r = session.get(tab_url, timeout=30)
-        yt_data = extract_json_from_html(r.text)
+        yt_data = extract_json_from_html(r.text, 'ytInitialData')
         if not yt_data:
             continue
 
@@ -291,7 +336,7 @@ def extract_video_details(video_url):
         days = days_since(published_at) if published_at else None
 
         # Description (for teacher detection only)
-        description = extract_description_from_html(html)
+        description = extract_description_for_teacher(html)
 
         return likes, comments, published_at, published_time, days, description
 
