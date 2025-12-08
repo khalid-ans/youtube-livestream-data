@@ -21,7 +21,7 @@ import json
 import os
 import requests
 import pandas as pd
-from datetime import datetime, timezone, date
+from datetime import datetime, timezone, date, timedelta
 import time
 import warnings
 
@@ -33,7 +33,7 @@ CHANNEL_URL = "https://www.youtube.com/@teachingpariksha"
 TARGET_LIVESTREAMS = 20
 
 # ================= SESSION =================
-# Back to the minimal headers that worked in your original CSV-only script
+# Minimal headers that worked earlier
 
 session = requests.Session()
 session.headers.update({
@@ -48,7 +48,6 @@ print("✅ HTTP session configured")
 # ================= HELPERS =================
 
 def extract_json_from_html(html, var_name="ytInitialData"):
-    """Same extractor as your working CSV-only script."""
     pattern = rf"var {var_name}\s*=\s*(\{{.*?\}});"
     match = re.search(pattern, html, re.DOTALL)
     if match:
@@ -112,7 +111,6 @@ def parse_duration_text(text):
 
 
 # ----- Teacher detection -----
-# 1) Direct name detection
 TEACHER_MAP_DIRECT = {
     "danish": "Danish Sir",
     "deepali": "Deepali Ma'am",
@@ -145,7 +143,6 @@ def detect_teacher_by_name(text: str) -> str:
     return "Unknown"
 
 
-# 2) Your subject-based mapping
 def get_teacher(t: str) -> str:
     t = t.lower()
 
@@ -200,7 +197,6 @@ def days_since(date_str, fmt="%d-%m-%Y"):
 
 
 def is_scheduled_or_upcoming(video):
-    """Filter out upcoming/scheduled streams."""
     if safe_get(video, "upcomingEventData") is not None:
         return True
 
@@ -227,14 +223,52 @@ def is_scheduled_or_upcoming(video):
 
     return False
 
+# ---------- NEW: parse relative "Streamed X days ago" text ----------
+
+def parse_relative_published(text: str):
+    """
+    Convert strings like:
+    - 'Streamed 3 days ago'
+    - '2 weeks ago'
+    - '1 year ago'
+    into (published_at_dd_mm_YYYY, days_since_published).
+    If parsing fails, return (None, None).
+    """
+    if not text:
+        return None, None
+
+    t = text.lower()
+    # extract first integer
+    m = re.search(r"(\d+)", t)
+    if not m:
+        return None, None
+
+    n = int(m.group(1))
+    days_offset = 0
+
+    if "minute" in t or "min" in t or "hour" in t or "hr" in t:
+        days_offset = 0
+    elif "day" in t:
+        days_offset = n
+    elif "week" in t:
+        days_offset = n * 7
+    elif "month" in t:
+        days_offset = n * 30
+    elif "year" in t:
+        days_offset = n * 365
+    else:
+        # Unknown unit, just assume days
+        days_offset = n
+
+    today = date.today()
+    pub_date = today - timedelta(days=days_offset)
+    published_at = pub_date.strftime("%d-%m-%Y")
+    days_since_pub = days_offset
+    return published_at, days_since_pub
+
 # ================= SCRAPER =================
 
 def fetch_channel_videos(url):
-    """
-    EXACTLY the logic style that was working in your simple CSV scraper:
-    - Try /streams, /videos, then channel root
-    - Parse ytInitialData -> twoColumnBrowseResultsRenderer -> tabs -> richGridRenderer
-    """
     tabs = [f"{url}/streams", f"{url}/videos", url]
     for tab_url in tabs:
         print("Trying:", tab_url)
@@ -264,14 +298,20 @@ def fetch_channel_videos(url):
     return []
 
 
-def extract_video_details(video_url):
+# ---------- UPDATED: takes approx_published_text from tile ----------
+
+def extract_video_details(video_url, approx_published_text=None):
     """
     For a given video URL:
     - likes
     - comments
-    - published_at (dd-mm-YYYY)  <- same style as Colab
+    - published_at (dd-mm-YYYY)
     - published_time (HH:MM:SS)
     - days_since_published (int)
+    Strategy:
+      1) Try uploadDate from watch HTML (exact when present)
+      2) Else, approximate using channel tile's publishedTimeText ("X days ago")
+      3) Else, fallback to today
     """
     try:
         r = session.get(video_url, timeout=30)
@@ -285,7 +325,7 @@ def extract_video_details(video_url):
         comments_match = re.search(r'"commentCount":"(\d+)"', html)
         comments = int(comments_match.group(1)) if comments_match else 0
 
-        # Published date/time (Colab-style uploadDate logic)
+        # -------- Try exact uploadDate first (if available) --------
         published_at = ""
         published_time = ""
         days = None
@@ -303,9 +343,19 @@ def extract_video_details(video_url):
                 published_time = dt.strftime("%H:%M:%S")
                 days = (date.today() - dt.date()).days
             except Exception:
-                pass
+                published_at = ""
+                published_time = ""
+                days = None
 
-        # Fallback if uploadDate missing
+        # -------- Fallback: use approx_published_text ("X days ago") --------
+        if not published_at and approx_published_text:
+            approx_date, approx_days = parse_relative_published(approx_published_text)
+            if approx_date is not None:
+                published_at = approx_date
+                published_time = "00:00:00"   # unknown exact time
+                days = approx_days
+
+        # -------- Final fallback: use "today" (should be rare) --------
         if not published_at:
             now = datetime.now(timezone.utc)
             published_at = now.strftime("%d-%m-%Y")
@@ -335,7 +385,6 @@ def main():
         if len(livestream_data) >= TARGET_LIVESTREAMS:
             break
 
-        # Skip scheduled/upcoming streams
         if is_scheduled_or_upcoming(video):
             continue
 
@@ -352,8 +401,14 @@ def main():
         len_text = safe_get(video, "lengthText", "simpleText", default="")
         duration_sec = parse_duration_text(len_text)
 
+        # NEW: grab the relative published text from tile (e.g. "Streamed 3 days ago")
+        published_tile_text = safe_get(video, "publishedTimeText", "simpleText", default="")
+
         video_url = f"https://www.youtube.com/watch?v={video_id}"
-        likes, comments, published_at, published_time, days_since_pub = extract_video_details(video_url)
+        likes, comments, published_at, published_time, days_since_pub = extract_video_details(
+            video_url,
+            approx_published_text=published_tile_text,
+        )
 
         teacher_name = extract_teacher_name_from_title(title)
 
@@ -457,9 +512,7 @@ def main():
 
     print("✅ CSV file saved:", csv_path)
     if not df.empty:
-        print(
-            "\n📊 SAMPLE:",
-        )
+        print("\n📊 SAMPLE:")
         print(
             df[
                 [
