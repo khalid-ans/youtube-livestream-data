@@ -290,33 +290,80 @@ def extract_video_details(video_url):
     For a given video URL:
     - likes
     - comments
-    - published_at (ISO date)
+    - published_at (YYYY-MM-DD)
     - published_time (HH:MM:SS)
-    - days_since_published
+    - days_since_published (int)
     """
     try:
         r = session.get(video_url, timeout=30)
         html = r.text
 
-        # Likes
+        # -------- Likes --------
         likes_match = re.search(r'"label":"([\d,]+) likes"', html)
         likes = parse_exact_count(likes_match.group(1)) if likes_match else 0
 
-        # Comments
+        # -------- Comments --------
         comments_match = re.search(r'"commentCount":"(\d+)"', html)
         comments = int(comments_match.group(1)) if comments_match else 0
 
-        # Upload date/time
-        upload_match = re.search(r'"uploadDate":"([^"]+)"', html)
-        if upload_match:
-            dt = datetime.fromisoformat(upload_match.group(1).replace("Z", "+00:00"))
+        # -------- Published date/time (robust) --------
+        dt = None
+
+        # 1) Try ytInitialPlayerResponse JSON
+        try:
+            player_data = extract_json_from_html(html, 'ytInitialPlayerResponse')
+        except Exception:
+            player_data = None
+
+        # candidate ISO-like value
+        iso_val = None
+
+        if player_data:
+            # microformat uploadDate / publishDate
+            iso_val = (
+                safe_get(player_data, 'microformat', 'playerMicroformatRenderer', 'uploadDate')
+                or safe_get(player_data, 'microformat', 'playerMicroformatRenderer', 'publishDate')
+            )
+
+            # For livestreams: startTimestamp / endTimestamp
+            if not iso_val:
+                iso_val = safe_get(
+                    player_data,
+                    'microformat', 'playerMicroformatRenderer', 'liveBroadcastDetails', 'startTimestamp'
+                ) or safe_get(
+                    player_data,
+                    'microformat', 'playerMicroformatRenderer', 'liveBroadcastDetails', 'endTimestamp'
+                )
+
+        # 2) Fallback: regex on "uploadDate"
+        if not iso_val:
+            upload_match = re.search(r'"uploadDate":"([^"]+)"', html)
+            if upload_match:
+                iso_val = upload_match.group(1)
+
+        # 3) Parse whatever iso_val we got
+        published_at = ""
+        published_time = ""
+        days = None
+
+        if iso_val:
+            s = str(iso_val).strip()
+            try:
+                if "T" in s:
+                    # full datetime
+                    if s.endswith("Z"):
+                        s = s.replace("Z", "+00:00")
+                    dt = datetime.fromisoformat(s)
+                else:
+                    # date only
+                    dt = datetime.strptime(s, "%Y-%m-%d")
+            except Exception:
+                dt = None
+
+        if dt is not None:
             published_at = dt.strftime("%Y-%m-%d")
             published_time = dt.strftime("%H:%M:%S")
-        else:
-            published_at = ""
-            published_time = ""
-
-        days = days_since(published_at) if published_at else None
+            days = (date.today() - dt.date()).days
 
         return likes, comments, published_at, published_time, days
 
@@ -476,3 +523,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
