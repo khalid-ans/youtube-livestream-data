@@ -24,6 +24,15 @@ jobs:
         with:
           python-version: "3.11"
 
+      # 👇 NEW: install Chromium + chromedriver for Selenium
+      - name: Install Chrome & chromedriver
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y chromium-browser chromium-chromedriver
+          # Optional debug: show paths
+          which chromium-browser || which chromium || echo "Chromium not found in PATH"
+          which chromedriver || echo "chromedriver not found in PATH"
+
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
@@ -47,7 +56,5 @@ jobs:
 
           git commit -m "Daily update: latest livestream CSV"
 
-          
-          
           # Use token to push
           git push https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }} HEAD:${{ github.ref_name }}
