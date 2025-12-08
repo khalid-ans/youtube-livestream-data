@@ -303,12 +303,13 @@ def fetch_channel_videos(url):
 def extract_video_details(video_url, approx_published_text=None):
     """
     For a given video URL:
-    - likes
-    - comments
-    - published_at (dd-mm-YYYY)
-    - published_time (HH:MM:SS)
+    - likes           (from ytInitialData -> segmentedLikeDislikeButtonRenderer, with fallbacks)
+    - comments        (from JSON / regex fallbacks)
+    - published_at    (dd-mm-YYYY)
+    - published_time  (HH:MM:SS)
     - days_since_published (int)
-    Strategy:
+
+    Strategy for date:
       1) Try uploadDate from watch HTML (exact when present)
       2) Else, approximate using channel tile's publishedTimeText ("X days ago")
       3) Else, fallback to today
@@ -317,19 +318,91 @@ def extract_video_details(video_url, approx_published_text=None):
         r = session.get(video_url, timeout=30)
         html = r.text
 
-        # Likes
-        likes_match = re.search(r'"label":"([\d,]+) likes"', html)
-        likes = parse_exact_count(likes_match.group(1)) if likes_match else 0
+        # ---------- 1) Parse ytInitialData JSON from watch page ----------
+        yt_data = extract_json_from_html(html, "ytInitialData")
 
-        # Comments
-        comments_match = re.search(r'"commentCount":"(\d+)"', html)
-        comments = int(comments_match.group(1)) if comments_match else 0
+        # ---------- 2) REAL LIKES via hidden JSON ----------
+        likes = 0
+        found_likes = False
 
-        # -------- Try exact uploadDate first (if available) --------
+        if yt_data:
+            results = safe_get(
+                yt_data,
+                "contents", "twoColumnWatchNextResults",
+                "results", "results", "contents",
+                default=[]
+            )
+            for item in results:
+                primary = item.get("videoPrimaryInfoRenderer")
+                if not primary:
+                    continue
+
+                buttons = safe_get(
+                    primary,
+                    "videoActions", "menuRenderer", "topLevelButtons",
+                    default=[]
+                )
+                for btn in buttons:
+                    # segmentedLikeDislikeButtonRenderer is the modern like button
+                    like_renderer = (
+                        safe_get(
+                            btn,
+                            "segmentedLikeDislikeButtonRenderer",
+                            "likeButton",
+                            "toggleButtonRenderer"
+                        )
+                        or safe_get(btn, "toggleButtonRenderer")
+                    )
+                    if like_renderer:
+                        # Accessibility label: e.g. "1,234 likes"
+                        access_label = safe_get(
+                            like_renderer,
+                            "defaultText", "accessibility",
+                            "accessibilityData", "label"
+                        )
+                        if access_label:
+                            likes = parse_exact_count(access_label)
+                            found_likes = True
+                            break
+                if found_likes:
+                    break
+
+        # Fallback: regex on plain HTML
+        if not found_likes:
+            like_match = re.search(r'"label":"([\d,]+)\s+likes"', html)
+            if like_match:
+                likes = parse_exact_count(like_match.group(1))
+
+        # ---------- 3) COMMENTS via JSON + regex ----------
+        comments = 0
+        found_comments = False
+
+        # Pattern 1: "commentCount":"1234" in JSON
+        comment_raw = re.search(r'"commentCount":"(\d+)"', html)
+        if comment_raw:
+            comments = int(comment_raw.group(1))
+            found_comments = True
+
+        # Pattern 2: "1,234 Comments" as text
+        if not found_comments:
+            comment_match = re.search(r'"text":"([\d,]+)\s+Comments"', html)
+            if comment_match:
+                comments = parse_exact_count(comment_match.group(1))
+                found_comments = True
+
+        # Pattern 3: sometimes in "simpleText":"1,234 Comments"
+        if not found_comments:
+            comment_match2 = re.search(r'"simpleText":"([\d,]+)\s+Comments"', html)
+            if comment_match2:
+                comments = parse_exact_count(comment_match2.group(1))
+                found_comments = True
+
+        # ---------- 4) Published date/time (same logic as before) ----------
         published_at = ""
         published_time = ""
         days = None
 
+        # Try exact uploadDate
         upload_match = re.search(r'"uploadDate":\s*"([^"]+)"', html)
         if upload_match:
             try:
@@ -347,15 +420,15 @@ def extract_video_details(video_url, approx_published_text=None):
                 published_time = ""
                 days = None
 
-        # -------- Fallback: use approx_published_text ("X days ago") --------
+        # Fallback: approximate from tile ("Streamed X days ago")
         if not published_at and approx_published_text:
             approx_date, approx_days = parse_relative_published(approx_published_text)
             if approx_date is not None:
                 published_at = approx_date
-                published_time = "00:00:00"   # unknown exact time
+                published_time = "00:00:00"
                 days = approx_days
 
-        # -------- Final fallback: use "today" (should be rare) --------
+        # Final fallback: today
         if not published_at:
             now = datetime.now(timezone.utc)
             published_at = now.strftime("%d-%m-%Y")
@@ -373,6 +446,7 @@ def extract_video_details(video_url, approx_published_text=None):
             now.strftime("%H:%M:%S"),
             0,
         )
+
 
 
 def main():
@@ -531,3 +605,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
