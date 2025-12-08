@@ -3,8 +3,9 @@ YouTube Livestream Data Extractor - CSV Only (GitHub Actions Safe)
 =================================================================
 - Extracts latest livestream data
 - Skips scheduled/upcoming streams (only already streamed)
-- Adds: description (first 4–5 lines), teacher_name, live_status,
-         published_at, published_time, likes, comments, days_since_published
+- Adds: teacher_name, live_status, published_at, published_time,
+         likes, comments, days_since_published
+- Teacher name is detected from title; if Unknown, we also search in description.
 - Adds derived metrics:
     engagement_score, duration_minutes, views_per_minute, views_per_day,
     engagement_per_view, like_rate, comment_rate
@@ -105,33 +106,45 @@ def parse_duration_text(text):
     return parts[0] if parts else 0
 
 
-def extract_teacher_name(title):
-    title_low = title.lower()
+TEACHER_MAP = {
+    "danish": "Danish Sir",
+    "deepali": "Deepali Ma'am",
+    "isha": "Isha Ma'am",
+    "kuldeep": "Kuldeep Sir",
+    "kajal": "Kajal Ma'am",
+    "mona": "Mona Ma'am",
+    "pawan": "Pawan Sir",
+    "narjis": "Narjis Ma'am",
+    "sachin": "Sachin Sir",
+    "abha": "Abha Ma'am"
+}
 
-    teacher_map = {
-        "danish": "Danish Sir",
-        "deepali": "Deepali Ma'am",
-        "isha": "Isha Ma'am",
-        "kuldeep": "Kuldeep Sir",
-        "kajal": "Kajal Ma'am",
-        "mona": "Mona Ma'am",
-        "pawan": "Pawan Sir",
-        "narjis": "Narjis Ma'am",
-        "sachin": "Sachin Sir",
-        "abha": "Abha Ma'am"
-    }
-
-    for key, value in teacher_map.items():
-        if key in title_low:
+def detect_teacher_in_text(text: str) -> str:
+    """Search for teacher keywords in a given text (lowercased)."""
+    if not text:
+        return "Unknown"
+    low = text.lower()
+    for key, value in TEACHER_MAP.items():
+        if key in low:
             return value
-
     return "Unknown"
+
+
+def extract_teacher_name(title: str, description: str = "") -> str:
+    """
+    First try title; if Unknown, try description with same keyword logic.
+    """
+    name = detect_teacher_in_text(title or "")
+    if name != "Unknown":
+        return name
+    # second pass: description
+    return detect_teacher_in_text(description or "")
 
 
 def extract_description_from_html(html):
     """
     Robust multi-fallback YouTube description extractor.
-    Returns only the first 4–5 lines (trimmed).
+    Used ONLY for teacher-name refinement (not saved to CSV).
     """
     try:
         desc = None
@@ -163,16 +176,7 @@ def extract_description_from_html(html):
         desc = desc.replace('\\"', '"')
         desc = desc.replace('\\\\', '\\')
 
-        # Keep only first 5 non-empty lines
-        lines = [ln.strip() for ln in desc.splitlines()]
-        non_empty = [ln for ln in lines if ln]
-        short = "\n".join(non_empty[:5])
-
-        # Extra safety: trim very long text
-        if len(short) > 1000:
-            short = short[:1000] + "... (trimmed)"
-
-        return short.strip()
+        return desc.strip()
 
     except Exception:
         return ""
@@ -260,7 +264,7 @@ def extract_video_details(video_url):
     - published_at (ISO date)
     - published_time (HH:MM:SS)
     - days_since_published
-    - description (first 4–5 lines)
+    - description (for teacher refinement only; NOT saved)
     """
     try:
         r = session.get(video_url, timeout=30)
@@ -286,7 +290,7 @@ def extract_video_details(video_url):
 
         days = days_since(published_at) if published_at else None
 
-        # Description
+        # Description (for teacher detection only)
         description = extract_description_from_html(html)
 
         return likes, comments, published_at, published_time, days, description
@@ -322,15 +326,15 @@ def main():
         len_text = safe_get(video, 'lengthText', 'simpleText', default='')
         duration_sec = parse_duration_text(len_text)
 
-        teacher_name = extract_teacher_name(title)
-
         video_url = f"https://www.youtube.com/watch?v={video_id}"
         likes, comments, published_at, published_time, days_since_pub, description = extract_video_details(video_url)
+
+        # Teacher detection: title first, then description if still Unknown
+        teacher_name = extract_teacher_name(title, description)
 
         livestream_data.append({
             "video_id": video_id,
             "title": title,
-            "description": description,
             "teacher_name": teacher_name,
             "live_status": "was_live",
             "published_at": published_at,
@@ -351,7 +355,7 @@ def main():
     # ------- Build DataFrame & derived metrics -------
 
     base_columns = [
-        "video_id", "title", "description", "teacher_name",
+        "video_id", "title", "teacher_name",
         "live_status", "published_at", "published_time",
         "days_since_published", "views", "likes", "comments",
         "duration_seconds", "url"
