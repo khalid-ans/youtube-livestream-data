@@ -4,7 +4,7 @@ YouTube Livestream Data Extractor - CSV Only (GitHub Actions Safe)
 - Extracts latest livestream data
 - Skips scheduled/upcoming streams (only already streamed)
 - Adds: teacher_name, live_status, published_at, published_time,
-         likes, comments, days_since_published
+         days_since_published, likes, comments
 - Teacher name is detected:
     1) Directly from title (Danish, Isha, Kajal, etc.)
     2) If Unknown, from subject/patterns in title using get_teacher()
@@ -13,7 +13,6 @@ YouTube Livestream Data Extractor - CSV Only (GitHub Actions Safe)
     engagement_per_view, like_rate, comment_rate
 - Always creates CSV:
     data/latest_20_livestreams_precise.csv
-- NEVER crashes if no data is found
 - NO Excel, NO openpyxl required
 """
 
@@ -36,9 +35,14 @@ TARGET_LIVESTREAMS = 20
 # ================= SESSION =================
 
 session = requests.Session()
+# Use Colab-style rich headers to match working behaviour
 session.headers.update({
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
     'Accept-Language': 'en-US,en;q=0.5',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Connection': 'keep-alive',
+    'Upgrade-Insecure-Requests': '1',
 })
 
 print("✅ HTTP session configured")
@@ -46,7 +50,7 @@ print("✅ HTTP session configured")
 # ================= HELPERS =================
 
 def extract_json_from_html(html, var_name='ytInitialData'):
-    """Generic extractor for embedded JSON blobs like ytInitialData / ytInitialPlayerResponse."""
+    """Generic extractor for embedded JSON blobs like ytInitialData."""
     pattern = rf'var {var_name}\s*=\s*(\{{.*?\}});'
     match = re.search(pattern, html, re.DOTALL)
     if match:
@@ -145,7 +149,7 @@ def detect_teacher_by_name(text: str) -> str:
     return "Unknown"
 
 
-# 2) Your subject-based mapping, used when direct name detection fails
+# 2) Subject-based mapping you provided
 def get_teacher(t: str) -> str:
     t = t.lower()  # Normalize to lowercase for easier matching
 
@@ -155,7 +159,6 @@ def get_teacher(t: str) -> str:
         return "Mona Ma'am"
     
     # Kuldeep Sir for General Science (Physics/Chem/Bio)
-    # Adding this prevents "Science" from being unmapped or mislabeled
     if "science" in t and "social" not in t: 
         return "Kuldeep Sir"
 
@@ -164,7 +167,7 @@ def get_teacher(t: str) -> str:
     if " hindi" in t:
         return "Isha Ma'am"
 
-    # English -> Pooja Ma'am (Updated from Narjis)
+    # English -> Pooja Ma'am
     if " english" in t:
         return "Pooja Ma'am"
 
@@ -211,7 +214,8 @@ def extract_teacher_name_from_title(title: str) -> str:
     return get_teacher(title or "")
 
 
-def days_since(date_str, fmt="%Y-%m-%d"):
+def days_since(date_str, fmt="%d-%m-%Y"):
+    """Compute days since given date string in dd-mm-YYYY format."""
     if not date_str:
         return None
     try:
@@ -290,7 +294,7 @@ def extract_video_details(video_url):
     For a given video URL:
     - likes
     - comments
-    - published_at (YYYY-MM-DD)
+    - published_at (dd-mm-YYYY)  <-- SAME FORMAT AS COLAB
     - published_time (HH:MM:SS)
     - days_since_published (int)
     """
@@ -306,69 +310,46 @@ def extract_video_details(video_url):
         comments_match = re.search(r'"commentCount":"(\d+)"', html)
         comments = int(comments_match.group(1)) if comments_match else 0
 
-        # -------- Published date/time (robust) --------
-        dt = None
-
-        # 1) Try ytInitialPlayerResponse JSON
-        try:
-            player_data = extract_json_from_html(html, 'ytInitialPlayerResponse')
-        except Exception:
-            player_data = None
-
-        # candidate ISO-like value
-        iso_val = None
-
-        if player_data:
-            # microformat uploadDate / publishDate
-            iso_val = (
-                safe_get(player_data, 'microformat', 'playerMicroformatRenderer', 'uploadDate')
-                or safe_get(player_data, 'microformat', 'playerMicroformatRenderer', 'publishDate')
-            )
-
-            # For livestreams: startTimestamp / endTimestamp
-            if not iso_val:
-                iso_val = safe_get(
-                    player_data,
-                    'microformat', 'playerMicroformatRenderer', 'liveBroadcastDetails', 'startTimestamp'
-                ) or safe_get(
-                    player_data,
-                    'microformat', 'playerMicroformatRenderer', 'liveBroadcastDetails', 'endTimestamp'
-                )
-
-        # 2) Fallback: regex on "uploadDate"
-        if not iso_val:
-            upload_match = re.search(r'"uploadDate":"([^"]+)"', html)
-            if upload_match:
-                iso_val = upload_match.group(1)
-
-        # 3) Parse whatever iso_val we got
+        # -------- Published date/time (Colab logic) --------
         published_at = ""
         published_time = ""
         days = None
 
-        if iso_val:
-            s = str(iso_val).strip()
+        upload_match = re.search(r'"uploadDate":\s*"([^"]+)"', html)
+        if upload_match:
             try:
-                if "T" in s:
-                    # full datetime
-                    if s.endswith("Z"):
-                        s = s.replace("Z", "+00:00")
-                    dt = datetime.fromisoformat(s)
+                raw = upload_match.group(1)  # e.g., 2025-02-10T15:30:00Z  or 2025-02-10
+                # Colab-style: use fromisoformat after replacing Z
+                iso = raw.replace('Z', '+00:00')
+                if 'T' in iso:
+                    dt = datetime.fromisoformat(iso)
                 else:
-                    # date only
-                    dt = datetime.strptime(s, "%Y-%m-%d")
+                    dt = datetime.strptime(iso, "%Y-%m-%d")
+                published_at = dt.strftime('%d-%m-%Y')  # EXACTLY LIKE COLAB
+                published_time = dt.strftime('%H:%M:%S')
+                days = (date.today() - dt.date()).days
             except Exception:
-                dt = None
+                pass
 
-        if dt is not None:
-            published_at = dt.strftime("%Y-%m-%d")
-            published_time = dt.strftime("%H:%M:%S")
-            days = (date.today() - dt.date()).days
+        # Fallback if uploadDate is missing or parsing failed
+        if not published_at:
+            now = datetime.now(timezone.utc)
+            published_at = now.strftime('%d-%m-%Y')
+            published_time = now.strftime('%H:%M:%S')
+            days = 0
 
         return likes, comments, published_at, published_time, days
 
     except Exception:
-        return 0, 0, "", "", None
+        # Safe fallback
+        now = datetime.now(timezone.utc)
+        return (
+            0,  # likes
+            0,  # comments
+            now.strftime('%d-%m-%Y'),
+            now.strftime('%H:%M:%S'),
+            0
+        )
 
 
 def main():
@@ -518,9 +499,8 @@ def main():
     print("✅ CSV file saved:", csv_path)
     if not df.empty:
         print("\n📊 SAMPLE:")
-        print(df[['title', 'teacher_name', 'views', 'likes', 'comments', 'views_per_day']].head(5).to_string())
+        print(df[['title', 'published_at', 'published_time', 'days_since_published', 'teacher_name', 'views']].head(5).to_string())
 
 
 if __name__ == "__main__":
     main()
-
