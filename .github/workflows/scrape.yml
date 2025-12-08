@@ -47,5 +47,8 @@ jobs:
 
           git commit -m "Daily update: latest livestream CSV"
 
+          git pull --rebase origin main
+          git push origin HEAD:main
+          
           # Use token to push
-          git push https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }} HEAD:${{ github.ref_name }}
+          #git push https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }} HEAD:${{ github.ref_name }}
