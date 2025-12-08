@@ -2,8 +2,9 @@
 YouTube Livestream Data Extractor - CSV Only (GitHub Actions Safe)
 =================================================================
 - Extracts latest livestream data
-- Adds: description, teacher_name, live_status, published_at, published_time,
-         likes, comments, days_since_published
+- Skips scheduled/upcoming streams (only already streamed)
+- Adds: description (first 4–5 lines), teacher_name, live_status,
+         published_at, published_time, likes, comments, days_since_published
 - Adds derived metrics:
     engagement_score, duration_minutes, views_per_minute, views_per_day,
     engagement_per_view, like_rate, comment_rate
@@ -28,7 +29,6 @@ warnings.filterwarnings('ignore')
 
 CHANNEL_URL = "https://www.youtube.com/@teachingpariksha"
 TARGET_LIVESTREAMS = 20
-ASSUME_STREAMS_TAB_ALL_LIVE = True
 
 # ================= SESSION =================
 
@@ -48,7 +48,7 @@ def extract_json_from_html(html, var_name='ytInitialData'):
     if match:
         try:
             return json.loads(match.group(1))
-        except:
+        except Exception:
             pass
 
     idx = html.find(var_name)
@@ -68,7 +68,7 @@ def extract_json_from_html(html, var_name='ytInitialData'):
             if depth == 0:
                 try:
                     return json.loads(html[start:i+1])
-                except:
+                except Exception:
                     return None
     return None
 
@@ -127,32 +127,34 @@ def extract_teacher_name(title):
 
     return "Unknown"
 
-#Description extracter
+
 def extract_description_from_html(html):
     """
     Robust multi-fallback YouTube description extractor.
-    Works for almost all watch page variants.
+    Returns only the first 4–5 lines (trimmed).
     """
     try:
-        # ✅ 1. PRIMARY: shortDescription inside player response
+        desc = None
+
+        # 1) PRIMARY: shortDescription in player response
         m1 = re.search(r'"shortDescription":"(.*?)","isCrawlable"', html, re.DOTALL)
         if m1:
             desc = m1.group(1)
-
         else:
-            # ✅ 2. FALLBACK: from videoDetails.description
+            # 2) FALLBACK: videoDetails.shortDescription
             m2 = re.search(r'"videoDetails":\{.*?"shortDescription":"(.*?)"', html, re.DOTALL)
             if m2:
                 desc = m2.group(1)
             else:
-                # ✅ 3. FALLBACK: metadata panel
+                # 3) FALLBACK: description.simpleText
                 m3 = re.search(r'"description":\{"simpleText":"(.*?)"\}', html, re.DOTALL)
                 if m3:
                     desc = m3.group(1)
-                else:
-                    return ""
 
-        # ✅ CLEAN-UP (VERY IMPORTANT)
+        if not desc:
+            return ""
+
+        # Clean escape sequences
         desc = desc.replace('\\n', '\n')
         desc = desc.replace('\\u0026', '&')
         desc = desc.replace('\\u003d', '=')
@@ -161,15 +163,19 @@ def extract_description_from_html(html):
         desc = desc.replace('\\"', '"')
         desc = desc.replace('\\\\', '\\')
 
-        # ✅ LIMIT SIZE (prevents sheet overflow & CSV corruption)
-        if len(desc) > 6000:
-            desc = desc[:6000] + "...(trimmed)"
+        # Keep only first 5 non-empty lines
+        lines = [ln.strip() for ln in desc.splitlines()]
+        non_empty = [ln for ln in lines if ln]
+        short = "\n".join(non_empty[:5])
 
-        return desc.strip()
+        # Extra safety: trim very long text
+        if len(short) > 1000:
+            short = short[:1000] + "... (trimmed)"
 
-    except Exception as e:
+        return short.strip()
+
+    except Exception:
         return ""
-
 
 
 def days_since(date_str, fmt="%Y-%m-%d"):
@@ -181,6 +187,41 @@ def days_since(date_str, fmt="%Y-%m-%d"):
         return None
     return (date.today() - d).days
 
+
+def is_scheduled_or_upcoming(video):
+    """
+    Try to detect scheduled/upcoming streams and filter them out.
+    """
+    # upcomingEventData present
+    if safe_get(video, 'upcomingEventData') is not None:
+        return True
+
+    # badges saying "UPCOMING" or "Scheduled"
+    badges = safe_get(video, 'badges', default=[])
+    for b in badges:
+        label = (safe_get(b, 'metadataBadgeRenderer', 'label', default='') or '').lower()
+        if 'upcoming' in label or 'scheduled' in label:
+            return True
+
+    # thumbnail overlays detecting upcoming
+    overlays = safe_get(video, 'thumbnailOverlays', default=[])
+    for o in overlays:
+        style = safe_get(o, 'thumbnailOverlayTimeStatusRenderer', 'style', default='')
+        if isinstance(style, str) and 'upcoming' in style.lower():
+            return True
+        text_label = (safe_get(o, 'thumbnailOverlayTimeStatusRenderer', 'text', 'simpleText', default='') or '').lower()
+        if 'upcoming' in text_label or 'scheduled' in text_label:
+            return True
+
+    # viewCountText typical phrases: "Waiting...", "Scheduled for ..."
+    vc_text = safe_get(video, 'viewCountText', 'simpleText', default='') or ''
+    if isinstance(vc_text, str):
+        vc_low = vc_text.lower()
+        if 'waiting' in vc_low or 'scheduled for' in vc_low:
+            return True
+
+    return False
+
 # ================= SCRAPER =================
 
 def fetch_channel_videos(url):
@@ -188,7 +229,7 @@ def fetch_channel_videos(url):
 
     for tab_url in tabs:
         print("Trying:", tab_url)
-        r = session.get(tab_url)
+        r = session.get(tab_url, timeout=30)
         yt_data = extract_json_from_html(r.text)
         if not yt_data:
             continue
@@ -203,11 +244,10 @@ def fetch_channel_videos(url):
             for item in rich:
                 vid = safe_get(item, 'richItemRenderer', 'content', 'videoRenderer')
                 if vid:
-                    vid['_from_streams_tab'] = True
                     videos.append(vid)
 
-            if videos:
-                return videos
+        if videos:
+            return videos
 
     return []
 
@@ -220,7 +260,7 @@ def extract_video_details(video_url):
     - published_at (ISO date)
     - published_time (HH:MM:SS)
     - days_since_published
-    - description
+    - description (first 4–5 lines)
     """
     try:
         r = session.get(video_url, timeout=30)
@@ -241,7 +281,6 @@ def extract_video_details(video_url):
             published_at = dt.strftime("%Y-%m-%d")
             published_time = dt.strftime("%H:%M:%S")
         else:
-            # If not found, leave blank
             published_at = ""
             published_time = ""
 
@@ -258,13 +297,17 @@ def extract_video_details(video_url):
 
 def main():
     videos_data = fetch_channel_videos(CHANNEL_URL)
-    print("✅ Total videos extracted:", len(videos_data))
+    print("✅ Total videos extracted from channel tabs:", len(videos_data))
 
     livestream_data = []
 
     for video in videos_data:
         if len(livestream_data) >= TARGET_LIVESTREAMS:
             break
+
+        # Skip scheduled/upcoming streams
+        if is_scheduled_or_upcoming(video):
+            continue
 
         video_id = safe_get(video, 'videoId')
         if not video_id:
@@ -273,10 +316,10 @@ def main():
         title_runs = safe_get(video, 'title', 'runs', default=[])
         title = "".join([r.get("text", "") for r in title_runs])
 
-        view_text = safe_get(video, 'viewCountText', 'simpleText')
+        view_text = safe_get(video, 'viewCountText', 'simpleText', default='')
         views = parse_exact_count(view_text)
 
-        len_text = safe_get(video, 'lengthText', 'simpleText')
+        len_text = safe_get(video, 'lengthText', 'simpleText', default='')
         duration_sec = parse_duration_text(len_text)
 
         teacher_name = extract_teacher_name(title)
@@ -303,7 +346,7 @@ def main():
         # Gentle delay to avoid hammering YouTube
         time.sleep(0.3)
 
-    print("✅ Final livestream rows:", len(livestream_data))
+    print("✅ Final livestream rows (excluding scheduled/upcoming):", len(livestream_data))
 
     # ------- Build DataFrame & derived metrics -------
 
@@ -324,17 +367,10 @@ def main():
     df = df[base_columns]
 
     # Derived metrics
-    def safe_num(x):
-        try:
-            return float(x)
-        except:
-            return 0.0
-
-    # Fill NaNs with 0 for numeric operations
-    df['views'] = df['views'].fillna(0).astype(float)
-    df['likes'] = df['likes'].fillna(0).astype(float)
-    df['comments'] = df['comments'].fillna(0).astype(float)
-    df['duration_seconds'] = df['duration_seconds'].fillna(0).astype(float)
+    df['views'] = pd.to_numeric(df['views'], errors='coerce').fillna(0.0)
+    df['likes'] = pd.to_numeric(df['likes'], errors='coerce').fillna(0.0)
+    df['comments'] = pd.to_numeric(df['comments'], errors='coerce').fillna(0.0)
+    df['duration_seconds'] = pd.to_numeric(df['duration_seconds'], errors='coerce').fillna(0.0)
 
     # engagement_score
     df['engagement_score'] = df['likes'] + df['comments']
@@ -358,7 +394,7 @@ def main():
             return row['views']
         try:
             d = float(days)
-        except:
+        except Exception:
             return row['views']
         if d <= 0:
             return row['views']
@@ -411,5 +447,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
