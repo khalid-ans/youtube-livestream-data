@@ -1,11 +1,18 @@
 """
-YouTube Livestream Data Extractor - CSV Only (GitHub Actions Safe)
-=================================================================
-- Extracts latest livestream data
-- Always creates CSV:
-    data/latest_20_livestreams_precise.csv
-- NEVER crashes if no data is found
-- NO Excel, NO openpyxl required
+YouTube Livestream Data Extractor - Precise Teacher & Real Counts Edition (CSV only)
+===================================================================================
+- Extracts latest livestreams from a channel
+- Precise teacher_name detection using title/description
+- Real like & comment counts from watch page
+- Published date/time
+- Derived metrics for analytics
+
+Output:
+  data/latest_20_livestreams_precise.csv
+
+Designed to run in:
+  - GitHub Actions
+  - Local Python (no Colab magics, no Excel)
 """
 
 import re
@@ -13,126 +20,228 @@ import json
 import os
 import requests
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, date
 import time
 import warnings
 
-warnings.filterwarnings('ignore')
+warnings.filterwarnings("ignore")
 
-# ================= CONFIG =================
+# ============================================================================
+# CONFIGURATION
+# ============================================================================
 
 CHANNEL_URL = "https://www.youtube.com/@teachingpariksha"
-TARGET_LIVESTREAMS = 20
-ASSUME_STREAMS_TAB_ALL_LIVE = True
 
-# ================= SESSION =================
+TARGET_LIVESTREAMS = 20   # Extract exactly 20 livestreams
+MAX_RETRIES = 3           # (not used heavily but kept for later)
+ASSUME_STREAMS_TAB_ALL_LIVE = True  # If True, treat all /streams videos as livestreams
+
+print(f"🎯 Target Channel: {CHANNEL_URL}")
+print(f"📊 Will extract {TARGET_LIVESTREAMS} livestreams")
+print(f"🔧 Streams tab mode: {'ALL videos treated as livestreams' if ASSUME_STREAMS_TAB_ALL_LIVE else 'Badge detection only'}\n")
+
+# ============================================================================
+# HTTP SESSION
+# ============================================================================
 
 session = requests.Session()
 session.headers.update({
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
     'Accept-Language': 'en-US,en;q=0.5',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Connection': 'keep-alive',
+    'Upgrade-Insecure-Requests': '1',
 })
 
-print("✅ HTTP session configured")
+print("✅ HTTP session configured\n")
 
-# ================= HELPERS =================
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
 
-def extract_json_from_html(html, var_name='ytInitialData'):
+def extract_json_from_html(html_content, var_name='ytInitialData'):
+    """Extract JSON data embedded in YouTube HTML."""
+    # Pattern 1: var ytInitialData = {...};
     pattern = rf'var {var_name}\s*=\s*(\{{.*?\}});'
-    match = re.search(pattern, html, re.DOTALL)
+    match = re.search(pattern, html_content, re.DOTALL)
     if match:
         try:
             return json.loads(match.group(1))
-        except:
+        except Exception:
             pass
 
-    idx = html.find(var_name)
-    if idx == -1:
-        return None
+    # Pattern 2: window["ytInitialData"] = {...};
+    pattern2 = rf'window\["{var_name}"\]\s*=\s*(\{{.*?\}});'
+    match2 = re.search(pattern2, html_content, re.DOTALL)
+    if match2:
+        try:
+            return json.loads(match2.group(1))
+        except Exception:
+            pass
 
-    start = html.find('{', idx)
-    if start == -1:
-        return None
-
-    depth = 0
-    for i in range(start, len(html)):
-        if html[i] == '{':
-            depth += 1
-        elif html[i] == '}':
-            depth -= 1
-            if depth == 0:
-                try:
-                    return json.loads(html[start:i+1])
-                except:
-                    return None
     return None
 
 
-def safe_get(d, *keys, default=None):
-    for k in keys:
-        if isinstance(d, dict):
-            d = d.get(k, default)
-        elif isinstance(d, list) and isinstance(k, int):
-            if k < len(d):
-                d = d[k]
-            else:
-                return default
-        else:
-            return default
-    return d
+def extract_teacher_name(title, description, uploader):
+    """
+    PRECISE METHOD: Checks for specific teachers first, then fallbacks.
+    """
+    t_text = title if title else ""
+    d_text = description if description else ""
+
+    # 1. PRECISE LIST CHECK
+    if 'Danish Sir' in t_text or 'Danish Sir' in d_text:
+        return 'Danish Sir'
+    elif "Deepali Ma'am" in t_text or "Deepali Ma'am" in d_text or "Deepali Maam" in t_text:
+        return 'Deepali Maam'
+    elif "Isha Ma'am" in t_text or "Isha Ma'am" in d_text or "Isha Maam" in t_text:
+        return 'Isha Maam'
+    elif 'Kuldeep Sir' in t_text or 'Kuldeep Sir' in d_text:
+        return 'Kuldeep Sir'
+    elif "Kajal Ma'am" in t_text or "Kajal Ma'am" in d_text or "Kajal Maam" in t_text:
+        return 'Kajal Maam'
+    elif "Mona Ma'am" in t_text or "Mona Ma'am" in d_text or "Mona Maam" in t_text:
+        return 'Mona Maam'
+    elif 'Pawan Sir' in t_text or 'Pawan Sir' in d_text:
+        return 'Pawan Sir'
+    elif "Narjis Ma'am" in t_text or "Narjis Ma'am" in d_text or "Narjis Maam" in t_text:
+        return 'Narjis Maam'
+    elif 'Sachin Sir' in t_text or 'Sachin Sir' in d_text:
+        return 'Sachin Sir'
+    elif "Abha Ma'am" in t_text or "Abha Ma'am" in d_text or "Abha Maam" in t_text:
+        return 'Abha Maam'
+
+    # 2. Fallback: " | Name" or "- Name" at end of title
+    name_at_end_pattern = r'(?:\||-)\s*([A-Za-z\.]+(?:\s+[A-Za-z\.]+){0,2})\s*$'
+    match_end = re.search(name_at_end_pattern, t_text.strip())
+
+    if match_end:
+        candidate = match_end.group(1).strip()
+        blacklist = ['Live', 'Hindi', 'English', 'Science', 'Maths', 'Marathon', 'Class', 'Paper', 'Teaching Pariksha']
+        if len(candidate) > 2 and not any(b.lower() in candidate.lower() for b in blacklist):
+            return candidate
+
+    # 3. Last Resort: Uploader
+    return uploader
 
 
 def parse_exact_count(text):
+    """Extracts exact integers from strings like '1,234 likes'."""
     if not text:
         return 0
-    text = re.sub(r"[^\d]", "", str(text))
-    return int(text) if text.isdigit() else 0
-
-
-def parse_duration_text(text):
-    if not text:
+    clean = re.sub(r'[^\d]', '', str(text))
+    try:
+        return int(clean)
+    except Exception:
         return 0
-    parts = [int(p) for p in text.split(":") if p.isdigit()]
+
+
+def parse_duration_text(duration_text):
+    """Parse '1:23:45' to seconds."""
+    if not duration_text or duration_text == 'LIVE':
+        return 0
+    parts = [int(p) for p in duration_text.strip().split(':') if p.isdigit()]
     if len(parts) == 3:
-        return parts[0]*3600 + parts[1]*60 + parts[2]
-    if len(parts) == 2:
-        return parts[0]*60 + parts[1]
+        return parts[0] * 3600 + parts[1] * 60 + parts[2]
+    elif len(parts) == 2:
+        return parts[0] * 60 + parts[1]
     return parts[0] if parts else 0
 
-# ================= SCRAPER =================
 
-def fetch_channel_videos(url):
-    tabs = [f"{url}/streams", f"{url}/videos", url]
-    for tab_url in tabs:
-        print("Trying:", tab_url)
-        r = session.get(tab_url)
-        yt_data = extract_json_from_html(r.text)
-        if not yt_data:
-            continue
+def safe_get(data, *keys, default=None):
+    """Safely navigate nested dictionary."""
+    for key in keys:
+        if isinstance(data, dict):
+            data = data.get(key, default)
+        elif isinstance(data, list) and isinstance(key, int) and len(data) > key:
+            data = data[key]
+        else:
+            return default
+    return data if data is not None else default
 
-        tab_data = safe_get(yt_data, 'contents', 'twoColumnBrowseResultsRenderer', 'tabs', default=[])
-        videos = []
 
-        for tab in tab_data:
-            content = safe_get(tab, 'tabRenderer', 'content', default={})
-            rich = safe_get(content, 'richGridRenderer', 'contents', default=[])
-            for item in rich:
-                vid = safe_get(item, 'richItemRenderer', 'content', 'videoRenderer')
-                if vid:
-                    vid['_from_streams_tab'] = True
-                    videos.append(vid)
+def days_since(date_str, fmt="%d-%m-%Y"):
+    """Calculate days since given date string; returns int or None."""
+    if not date_str:
+        return None
+    try:
+        d = datetime.strptime(date_str, fmt).date()
+    except Exception:
+        return None
+    return (date.today() - d).days
+
+
+print("✅ Helper functions loaded\n")
+
+# ============================================================================
+# FETCH CHANNEL PAGE AND EXTRACT VIDEO DATA
+# ============================================================================
+
+print("🔍 Fetching channel page...")
+
+
+def fetch_channel_videos(channel_url):
+    tab_urls = [f"{channel_url}/streams", f"{channel_url}/videos", channel_url]
+
+    for tab_idx, tab_url in enumerate(tab_urls):
+        try:
+            print(f"  📥 Trying: {tab_url}")
+            response = session.get(tab_url, timeout=30)
+            if response.status_code != 200:
+                continue
+
+            yt_data = extract_json_from_html(response.text, 'ytInitialData')
+            if not yt_data:
+                continue
+
+            tabs = safe_get(yt_data, 'contents', 'twoColumnBrowseResultsRenderer', 'tabs', default=[])
+            videos = []
+            from_streams = '/streams' in tab_url or tab_idx == 0
+
+            for tab in tabs:
+                content = safe_get(tab, 'tabRenderer', 'content', default={})
+
+                # Rich Grid
+                rich_grid = safe_get(content, 'richGridRenderer', 'contents', default=[])
+                for item in rich_grid:
+                    vid = safe_get(item, 'richItemRenderer', 'content', 'videoRenderer')
+                    if vid:
+                        vid['_from_streams_tab'] = from_streams
+                        videos.append(vid)
+
+                # Section List
+                section_list = safe_get(content, 'sectionListRenderer', 'contents', default=[])
+                for section in section_list:
+                    items = safe_get(section, 'itemSectionRenderer', 'contents', default=[])
+                    for item in items:
+                        vid = safe_get(item, 'gridVideoRenderer') or safe_get(item, 'videoRenderer')
+                        if vid:
+                            vid['_from_streams_tab'] = from_streams
+                            videos.append(vid)
+
             if videos:
+                print(f"    ✅ Found {len(videos)} videos")
                 return videos
+        except Exception as e:
+            print(f"    ❌ Error: {str(e)[:60]}")
+            continue
     return []
 
 
+# ============================================================================
+# MAIN
+# ============================================================================
+
 def main():
     videos_data = fetch_channel_videos(CHANNEL_URL)
-    print("✅ Total videos extracted:", len(videos_data))
+    print(f"\n✅ Total videos extracted: {len(videos_data)}\n")
 
+    print("🔍 Parsing initial metadata...")
     livestream_data = []
 
-    for video in videos_data:
+    # --- Filter & basic metadata ---
+    for idx, video in enumerate(videos_data, 1):
         if len(livestream_data) >= TARGET_LIVESTREAMS:
             break
 
@@ -140,33 +249,256 @@ def main():
         if not video_id:
             continue
 
+        # Livestream Detection
+        is_stream_tab = video.get('_from_streams_tab', False)
+        badges = safe_get(video, 'badges', default=[])
+        overlays = safe_get(video, 'thumbnailOverlays', default=[])
+
+        is_live_status = 'none'
+        if ASSUME_STREAMS_TAB_ALL_LIVE and is_stream_tab:
+            is_live_status = 'was_live'
+
+        # Refine status with badges
+        for badge in badges:
+            label = safe_get(badge, 'metadataBadgeRenderer', 'label', default='').lower()
+            if 'live' in label:
+                is_live_status = 'is_live'
+
+        if is_live_status == 'none':
+            continue
+
+        # Basic extraction
         title_runs = safe_get(video, 'title', 'runs', default=[])
-        title = "".join([r.get("text", "") for r in title_runs])
+        title = ''.join([r.get('text', '') for r in title_runs])
 
-        view_text = safe_get(video, 'viewCountText', 'simpleText')
-        views = parse_exact_count(view_text)
+        desc_snippet = safe_get(video, 'descriptionSnippet', 'runs', default=[])
+        description = ''.join([r.get('text', '') for r in desc_snippet])
 
+        uploader_runs = safe_get(video, 'ownerText', 'runs', default=[])
+        uploader = ''.join([r.get('text', '') for r in uploader_runs])
+
+        # Initial views
+        view_text = safe_get(video, 'viewCountText', 'simpleText') or safe_get(video, 'viewCountText', 'runs', 0, 'text')
+        views = parse_exact_count(view_text) if view_text else 0
+
+        # Duration
         len_text = safe_get(video, 'lengthText', 'simpleText')
+        if not len_text:
+            for o in overlays:
+                len_text = safe_get(o, 'thumbnailOverlayTimeStatusRenderer', 'text', 'simpleText')
+                if len_text:
+                    break
         duration_sec = parse_duration_text(len_text)
 
+        # Approx published text (e.g. "3 days ago") – kept just in case
+        published_text = safe_get(video, 'publishedTimeText', 'simpleText')
+
         livestream_data.append({
-            "video_id": video_id,
-            "title": title,
-            "views": views,
-            "duration_seconds": duration_sec,
-            "url": f"https://www.youtube.com/watch?v={video_id}"
+            'video_id': video_id,
+            'title': title,
+            'description': description,
+            'uploader': uploader,
+            'url': f"https://www.youtube.com/watch?v={video_id}",
+            'live_status': is_live_status,
+            'duration_seconds': duration_sec,
+            'views': views,
+            'published_text_approx': published_text,
+            'likes': 0,
+            'comments': 0,
+            'teacher_name': 'Unknown'
         })
 
-    print("✅ Filtered livestreams:", len(livestream_data))
+    print(f"✅ Filtered {len(livestream_data)} livestreams to analyze")
 
-    # ✅ ALWAYS CREATE CSV (even if empty)
+    # If none found, still create an empty CSV with headers
+    if not livestream_data:
+        print("\n❌ No data found. Creating EMPTY CSV (headers only).")
+        # define columns for CSV
+        base_columns = [
+            'video_id', 'title', 'teacher_name', 'live_status',
+            'published_at', 'published_time',
+            'views', 'likes', 'comments',
+            'duration_seconds', 'url'
+        ]
+        derived_columns = [
+            'days_since_published', 'engagement_score',
+            'views_per_day', 'views_per_minute',
+            'engagement_per_view', 'like_rate', 'comment_rate'
+        ]
+        all_columns = base_columns + derived_columns
+        empty_df = pd.DataFrame(columns=all_columns)
+        os.makedirs("data", exist_ok=True)
+        csv_path = os.path.join("data", "latest_20_livestreams_precise.csv")
+        empty_df.to_csv(csv_path, index=False, encoding="utf-8")
+        print(f"✅ Empty CSV saved: {csv_path}")
+        return
+
+    # --- Detailed metadata: teacher, published_at, likes, comments ---
+    print("\n📥 Fetching detailed metadata (Real Likes, Comments & Teacher Names)...")
+    print("⏳ This may take a bit...\n")
+
+    for idx, stream in enumerate(livestream_data, 1):
+        try:
+            response = session.get(stream['url'], timeout=30)
+            if response.status_code != 200:
+                continue
+            html = response.text
+
+            # Teacher name
+            stream['teacher_name'] = extract_teacher_name(
+                stream['title'],
+                stream['description'],
+                stream['uploader']
+            )
+
+            # Published date/time
+            upload_match = re.search(r'"uploadDate":\s*"([^"]+)"', html)
+            if upload_match:
+                try:
+                    dt = datetime.fromisoformat(upload_match.group(1).replace('Z', '+00:00'))
+                    stream['published_at'] = dt.strftime('%d-%m-%Y')
+                    stream['published_time'] = dt.strftime('%H:%M:%S')
+                    stream['actual_iso'] = dt.isoformat()
+                except Exception:
+                    pass
+
+            if 'published_at' not in stream:
+                now = datetime.now()
+                stream['published_at'] = now.strftime('%d-%m-%Y')
+                stream['published_time'] = '00:00:00'
+
+            # Real likes & comments
+            yt_data = extract_json_from_html(html, 'ytInitialData')
+
+            # Likes
+            found_likes = False
+            if yt_data:
+                results = safe_get(
+                    yt_data,
+                    'contents', 'twoColumnWatchNextResults',
+                    'results', 'results', 'contents',
+                    default=[]
+                )
+                for item in results:
+                    primary = item.get('videoPrimaryInfoRenderer')
+                    if primary:
+                        buttons = safe_get(primary, 'videoActions', 'menuRenderer', 'topLevelButtons', default=[])
+                        for btn in buttons:
+                            like_renderer = safe_get(
+                                btn,
+                                'segmentedLikeDislikeButtonRenderer', 'likeButton', 'toggleButtonRenderer'
+                            ) or safe_get(btn, 'toggleButtonRenderer')
+                            if like_renderer:
+                                access_label = safe_get(
+                                    like_renderer,
+                                    'defaultText', 'accessibility', 'accessibilityData', 'label'
+                                )
+                                if access_label:
+                                    stream['likes'] = parse_exact_count(access_label)
+                                    found_likes = True
+                                    break
+                        if found_likes:
+                            break
+
+            if not found_likes:
+                like_match = re.search(r'"label":"([\d,]+) likes"', html)
+                if like_match:
+                    stream['likes'] = parse_exact_count(like_match.group(1))
+
+            # Comments
+            found_comments = False
+            comment_match = re.search(r'"text":"([\d,]+) Comments"', html)
+            if comment_match:
+                stream['comments'] = parse_exact_count(comment_match.group(1))
+                found_comments = True
+
+            if not found_comments:
+                raw_count = re.search(r'"commentCount":"(\d+)"', html)
+                if raw_count:
+                    stream['comments'] = int(raw_count.group(1))
+
+            if idx % 5 == 0:
+                print(f"  ✓ Processed {idx}/{len(livestream_data)} videos...")
+                time.sleep(0.5)
+
+        except Exception as e:
+            print(f"  ⚠️ Error on {stream['video_id']}: {str(e)[:50]}")
+            continue
+
+    print("\n✅ Detailed metadata fetched successfully")
+
+    # --- Build DataFrame & derived features ---
+    base_columns = [
+        'video_id', 'title', 'teacher_name', 'live_status',
+        'published_at', 'published_time',
+        'views', 'likes', 'comments',
+        'duration_seconds', 'url'
+    ]
+
     df = pd.DataFrame(livestream_data)
 
-    os.makedirs("data", exist_ok=True)
-    csv_path = "data/latest_20_livestreams_precise.csv"
-    df.to_csv(csv_path, index=False, encoding="utf-8")
+    # Ensure base columns exist
+    for col in base_columns:
+        if col not in df.columns:
+            df[col] = ''
 
-    print("✅ CSV file saved:", csv_path)
+    df = df[base_columns]
+
+    # Derived: days_since_published
+    df['days_since_published'] = df['published_at'].apply(lambda x: days_since(x) if x else None)
+
+    # Engagement score
+    df['engagement_score'] = df['likes'].fillna(0) + df['comments'].fillna(0)
+
+    # Views per day
+    def calc_views_per_day(row):
+        days = row['days_since_published']
+        if days is None or days <= 0:
+            return row['views']
+        return row['views'] / days
+
+    df['views_per_day'] = df.apply(calc_views_per_day, axis=1)
+
+    # Views per minute of video
+    df['views_per_minute'] = df.apply(
+        lambda r: 0 if r['duration_seconds'] in [0, None] else r['views'] / (r['duration_seconds'] / 60.0),
+        axis=1
+    )
+
+    # Engagement per view
+    df['engagement_per_view'] = df.apply(
+        lambda r: 0 if r['views'] in [0, None] else r['engagement_score'] / r['views'],
+        axis=1
+    )
+
+    # Like rate and comment rate
+    df['like_rate'] = df.apply(
+        lambda r: 0 if r['views'] in [0, None] else r['likes'] / r['views'],
+        axis=1
+    )
+    df['comment_rate'] = df.apply(
+        lambda r: 0 if r['views'] in [0, None] else r['comments'] / r['views'],
+        axis=1
+    )
+
+    # Final column order
+    derived_columns = [
+        'days_since_published', 'engagement_score',
+        'views_per_day', 'views_per_minute',
+        'engagement_per_view', 'like_rate', 'comment_rate'
+    ]
+    all_columns = base_columns + derived_columns
+    df = df[all_columns]
+
+    # --- Save to CSV (for GitHub Actions / Google Sheets) ---
+    os.makedirs("data", exist_ok=True)
+    csv_path = os.path.join("data", "latest_20_livestreams_precise.csv")
+    df.to_csv(csv_path, index=False, encoding="utf-8")
+    print(f"\n✅ CSV file saved: {csv_path}")
+
+    # Small console summary
+    print("\n📊 SAMPLE SUMMARY:")
+    print(df[['title', 'teacher_name', 'views', 'likes', 'comments', 'views_per_day']].head(10).to_string())
 
 
 if __name__ == "__main__":
